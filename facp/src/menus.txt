@@ -1,0 +1,33 @@
+[testing]
+- walk test
+- strobe test
+- full system test
+[settings]
+- [fire alarm settings]
+- - [coding]
+- - - Temporal 3 = 0
+- - - Marchtime = 1
+- - - 4-4 = 2
+- - - Continuious = 3
+- - - California = 4
+- - - Marchtime (slower) = 5
+- - verification
+- - verification time
+- - audible silence
+- - advanced smoke detector verification
+- - smoke detector verification timeout
+- [panel settings]
+- - [panel name]
+- - - enter panel name
+- - [homescreen]
+- - - panel name
+- - - [stats for nerds]
+- - - - zone input voltages
+- - lcd timeout
+[advanced settings]
+- [resistor lenience]
+- - 0-200
+- [EOL resistors]
+- - enabled
+- - disabled
+

@@ -21,9 +21,10 @@ int currentScreen = 0; //update display if previous screen is not the same
 //CONFIG VARIABLES
 bool keyRequired = true; //determine if key switch is required to operate buttons
 bool isVerification = true; //is verification turned on
+bool eolResistor = true; //is the EOL resistor enabled
 int codeWheel = 0; //which alarm pattern to use, code-3 default
 int verificationTime = 2500;
-
+int resistorLenience = 0;
 LiquidCrystal_I2C lcd(0x27,16,2);
 
 void setup() {
@@ -79,6 +80,15 @@ void setup() {
     EEPROM.write(9,1); //verification is turned on by default
     EEPROM.write(10,25); //default verification time of 2.5 seconds
 
+    //system name "[DEFAULT NAME]"
+    EEPROM.write(11,91);EEPROM.write(12,68);EEPROM.write(13,69);EEPROM.write(14,70);EEPROM.write(15,65);EEPROM.write(16,85);EEPROM.write(17,76);EEPROM.write(18,84);EEPROM.write(19,32);EEPROM.write(20,78);EEPROM.write(21,65);EEPROM.write(22,77);EEPROM.write(23,69);EEPROM.write(24,93);
+    for (int i=25; i==71; i++){ //write all 0's from 25-71 address
+      EEPROM.write(i,0);
+    }
+    EEPROM.write(72,0); //EOL lenience 0 by default
+    EEPROM.write(73,1); //EOL resistor is enabled by default
+
+
     EEPROM.commit();
   } else {
     Serial.println("EEPROM verification finished");
@@ -104,8 +114,13 @@ void setup() {
   } else {
     isVerification = false;
   }
+  if (EEPROM.read(73) == 1){
+    eolResistor = true;
+  } else {
+    eolResistor = false;
+  }
   verificationTime = EEPROM.read(10)*100;
-
+  resistorLenience = EEPROM.read(72);
   Serial.println("Config loaded");
   digitalWrite(27, HIGH); //power on ready LED on startup
 }
@@ -131,7 +146,7 @@ void checkKey(){
 
 void checkDevices(){
 
-  if (analogRead(15) <= 500 and horn != true){
+  if (analogRead(15) <= resistorLenience and horn != true){
     verification++;
   } else {
     verification = 0;
@@ -141,7 +156,7 @@ void checkDevices(){
     strobe = true;
     fullAlarm = true;
     tone();
-  } else if (analogRead(15) == 4095) {
+  } else if (analogRead(15) == 4095 and eolResistor == true) {
     trouble = true;
     troubleType=1;
   }
@@ -181,12 +196,14 @@ void checkButtons(){
     digitalWrite(26, HIGH); //silence LED
     digitalWrite(25, HIGH); //alarm LED  
     delay(1500);
+    noTone();
     ESP.restart();
   }
 
   if (digitalRead(35) == HIGH){ //SILENCE BUTTON
     if (horn == true){ //if horns are not silenced, silence the horns
       digitalWrite(26, HIGH);
+      digitalWrite(25, LOW);
       horn = false;
     } else if (horn == false and strobe == true){ //if the horns are silenced and the button is pressed again, silence the buzzer
       noTone();
@@ -200,6 +217,8 @@ void checkButtons(){
     if (drill == 2000){
       horn = true;
       strobe = true;
+      fullAlarm = true;
+      tone();
     } else {
       drill++;
     }
@@ -280,6 +299,24 @@ void alarm(){
     
     } else if (codeWheel == 3) { //continuous
       digitalWrite(13, LOW);
+    } else if (codeWheel == 5) {
+      if (codeWheelTimer == 0){ //marchtime slower
+        digitalWrite(13, LOW);
+      } else if (codeWheelTimer == 500){
+        digitalWrite(13, HIGH);
+      } else if (codeWheelTimer == 1000){
+        codeWheelTimer = -1;
+      }
+
+    } else if (codeWheel == 4) {
+      if (codeWheelTimer == 0){ //california code
+        digitalWrite(13, LOW);
+      } else if (codeWheelTimer == 10000){
+        digitalWrite(13, HIGH);
+      } else if (codeWheelTimer == 5000){
+        codeWheelTimer = -1;
+      }
+
     }
 
     codeWheelTimer++;
@@ -317,15 +354,15 @@ void lcdUpdate(){
       lcd.clear();
       lcd.setCursor(1,0);
       lcd.print("*** Trouble ***");
-      lcd.setCursor(2,1);
-      lcd.print("Ground Fault");
+      lcd.setCursor(2,0);
+      lcd.print("Device removed or EOL resistor not installed");
       currentScreen = 2;
     } else if (fullAlarm == true and currentScreen != 3){
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("*** FIRE ALARM ***");
       lcd.setCursor(2,1);
-      lcd.print("zone info here");
+      lcd.print("Zone 1");
       currentScreen = 3;
     }
   }
@@ -345,7 +382,7 @@ void loop() {
   } else {
     lcdUpdateTimer++;
   }
-  Serial.println(digitalRead(35));
+  Serial.println(analogRead(15));
 }
 
 
