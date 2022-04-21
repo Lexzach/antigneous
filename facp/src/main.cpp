@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
+#include <string.h>
 
 //RUNTIME VARIABLES
 bool fullAlarm = false; //bool to control if this is a full alarm that requres a panel reset to clear
@@ -25,6 +26,8 @@ bool eolResistor = true; //is the EOL resistor enabled
 int codeWheel = 0; //which alarm pattern to use, code-3 default
 int verificationTime = 2500;
 int resistorLenience = 0;
+int panelHomescreen = 0;
+String panelName = "";
 LiquidCrystal_I2C lcd(0x27,16,2);
 
 void setup() {
@@ -33,17 +36,20 @@ void setup() {
   Serial.println("Booting...");
 
   pinMode(13, OUTPUT); //horn
-  pinMode(12, OUTPUT); //strobe
+  pinMode(18, OUTPUT); //strobe
   pinMode(14, OUTPUT); //smoke relay
-  pinMode(27, OUTPUT); //ready LED
-  pinMode(26, OUTPUT); //silence LED
-  pinMode(25, OUTPUT); //alarm LED
-  pinMode(33, INPUT); //key switch
-  pinMode(32, INPUT); //reset switch
-  pinMode(35, INPUT); //silence switch
-  pinMode(34, INPUT); //drill switch
-  pinMode(15, INPUT); //pull station
-  pinMode(4, OUTPUT); //buzzer
+  pinMode(27, OUTPUT); //ready LED D
+  pinMode(26, OUTPUT); //silence LED D
+  pinMode(25, OUTPUT); //alarm LED D
+  pinMode(33, INPUT); //key switch D
+  pinMode(32, INPUT); //reset switch D
+  pinMode(35, INPUT); //silence switch D
+  pinMode(34, INPUT); //drill switch D
+  pinMode(15, INPUT); //pull station D
+  pinMode(4, OUTPUT); //buzzer D
+  digitalWrite(13, HIGH); //horn
+  digitalWrite(18, HIGH); //strobe
+  digitalWrite(14, HIGH); //smoke relay
   
   pinMode(22, OUTPUT); //scl
   pinMode(21, OUTPUT); //sda
@@ -82,11 +88,17 @@ void setup() {
 
     //system name "[DEFAULT NAME]"
     EEPROM.write(11,91);EEPROM.write(12,68);EEPROM.write(13,69);EEPROM.write(14,70);EEPROM.write(15,65);EEPROM.write(16,85);EEPROM.write(17,76);EEPROM.write(18,84);EEPROM.write(19,32);EEPROM.write(20,78);EEPROM.write(21,65);EEPROM.write(22,77);EEPROM.write(23,69);EEPROM.write(24,93);
-    for (int i=25; i==71; i++){ //write all 0's from 25-71 address
+    for (int i=25; i<=71; i++){ //write all 0's from 25-71 address
       EEPROM.write(i,0);
     }
     EEPROM.write(72,0); //EOL lenience 0 by default
     EEPROM.write(73,1); //EOL resistor is enabled by default
+    EEPROM.write(74,0); //pre-alarm disabled by default
+    EEPROM.write(75,1); //pre-alarm first-stage is 1 minute by default
+    EEPROM.write(76,0); //smoke detector pre-alarm is disable by default
+    EEPROM.write(77,1); //smoke detector timeout
+    EEPROM.write(78,0); //homescreen is panel name by default
+
 
 
     EEPROM.commit();
@@ -121,8 +133,19 @@ void setup() {
   }
   verificationTime = EEPROM.read(10)*100;
   resistorLenience = EEPROM.read(72);
+  panelHomescreen = EEPROM.read(78);
+  for (int i=11; i<=71; i++){ //read panel name
+      if (EEPROM.read(i) != 0){
+        panelName = panelName + (char)EEPROM.read(i);
+      }
+      Serial.println(panelName);
+    }
+
   Serial.println("Config loaded");
   digitalWrite(27, HIGH); //power on ready LED on startup
+  digitalWrite(26, LOW);
+  digitalWrite(25, LOW);
+  digitalWrite(14, LOW); //smoke relay
 }
 
 void tone() {
@@ -191,11 +214,17 @@ void troubleCheck(){
 
 void checkButtons(){
   if (digitalRead(32) == HIGH){ //RESET BUTTON
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Resetting...");
     tone();
     digitalWrite(27, HIGH); //ready LED
     digitalWrite(26, HIGH); //silence LED
     digitalWrite(25, HIGH); //alarm LED  
-    delay(1500);
+    digitalWrite(13, HIGH); //horn
+    digitalWrite(18, HIGH); //strobe
+    digitalWrite(14, HIGH); //smoke relay
+    delay(2500);
     noTone();
     ESP.restart();
   }
@@ -228,6 +257,11 @@ void checkButtons(){
 }
 
 void alarm(){
+  if (strobe == true){
+    digitalWrite(18, LOW);
+  }else{
+    digitalWrite(18,HIGH);
+  }
   if (horn == true){
     if (codeWheel == 0){
 
@@ -341,6 +375,12 @@ void lcdUpdate(){
       lcd.clear();
       lcd.setCursor(2,0);
       lcd.print("System Normal");
+      lcd.setCursor(0,1);
+      if (panelHomescreen == 0){
+        lcd.print(panelName);
+      } else if (panelHomescreen == 1){
+        lcd.print(analogRead(15));
+      }
       currentScreen = 0;
   } else if (trouble==true){
     if (troubleType == 0 and currentScreen != 1){
@@ -382,7 +422,7 @@ void loop() {
   } else {
     lcdUpdateTimer++;
   }
-  Serial.println(analogRead(15));
+  
 }
 
 
