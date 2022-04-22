@@ -27,6 +27,7 @@ int alarmLedTimer = 0; //alarm led timer
 int troubleType = 0; //trouble type 0 - general, 1 - eol resistor
 int lcdUpdateTimer = 0; //update delay
 int currentScreen = -1; //update display if previous screen is not the same
+int configPage = 0; //config page for the config menu
 String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
@@ -278,6 +279,11 @@ void checkButtons(){
       noTone();
     } else if (horn == false and strobe == false and fullAlarm == false and silencePressed == false and configMenu == false){
       configMenu = true;
+      resetStillPressed = true; //make sure the menu doesn't close out as soon as someone opens it
+      silenceStillPressed = true;
+      drillStillPressed = true;
+      currentConfigBottom = "";
+      currentConfigTop = "";
     }
     silencePressed = true;
   } else {
@@ -460,18 +466,18 @@ void lcdUpdate(){
   }
 }
 void config(){
-  char *main[] = {"Testing","Settings"};
-  char *mainTesting[] = {"Walk Test","Silent Walk Test","Strobe Test","Automatic System Test"};
-  char *mainSettings[] = {"Fire Alarm Settings","Panel Settings"};
-  char *mainSettingsFireAlarmSettings[] = {"Coding: ","Verification Settings","Pre-Alarm Settings","Audible Silence: "};
-  char *mainSettingsVerificationSettings[] = {"Verification: ","Verification Time: "};
-  char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slower Marchtime"};
-  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","First Stage Time: ","Smoke Detector Pre-Alarm Settings"};
-  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Smoke Detector Pre-Alarm: ","Smoke Detector Starts First Stage: ","Smoke Detector Timeout: "};
-  char *mainPanelSettings[] = {"Panel Name","Panel Security: ","Homescreen","LCD Timeout: "};
-  char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"};
-  char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"};
-  char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"};
+  char *main[] = {"Testing","Settings"}; //menu 0
+  char *mainTesting[] = {"Walk Test","Silent Walk Test","Strobe Test","Automatic System Test"}; //menu 1
+  char *mainSettings[] = {"Fire Alarm Settings","Panel Settings"}; //menu 2
+  char *mainSettingsFireAlarmSettings[] = {"Coding: ","Verification Settings","Pre-Alarm Settings","Audible Silence: "}; //menu 3
+  char *mainSettingsVerificationSettings[] = {"Verification: ","Verification Time: "}; //menu 4
+  char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slower Marchtime"}; //menu 5
+  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","First Stage Time: ","Smoke Detector Pre-Alarm Settings"}; //menu 6
+  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Smoke Detector Pre-Alarm: ","Smoke Detector Starts First Stage: ","Smoke Detector Timeout: "}; //menu 7
+  char *mainPanelSettings[] = {"Panel Name","Panel Security: ","Homescreen","LCD Timeout: "}; //menu 8
+  char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
+  char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
+  char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"}; //menu 11
   if (digitalRead(32) == HIGH){ //RESET BUTTON
     resetPressed = true;
   } else {
@@ -491,9 +497,16 @@ void config(){
     drillStillPressed = false;
   }
 
+  if (configPage == 0){
+    configTop = (String)main[0];
+    configBottom = (String)main[1];
+    if (silencePressed == true and silenceStillPressed == false){
+      silencePressed = true;
+      configMenu = false;
+      currentScreen=-1;
+    }
+  }
   
-  configTop = (String)main[0];
-  configBottom = (String)main[1];
 
   // char buffer1[configTop.length()];
   // char buffer2[configBottom.length()];
@@ -535,14 +548,15 @@ void loop() {
   alarm(); //alarm codewheel
   if (configMenu==false){
     lcdUpdate();
-    lcdUpdateTimer=0;
+    // lcdUpdateTimer=0;
   } else if (configMenu==true) {
     if (keyInserted == true or keyRequired == false){
       config();
     }
-  } else {
-    lcdUpdateTimer++;
-  }
+  } 
+  // else {
+  //   lcdUpdateTimer++;
+  // }
   
 }
 
