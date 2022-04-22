@@ -5,11 +5,20 @@
 
 //RUNTIME VARIABLES
 bool fullAlarm = false; //bool to control if this is a full alarm that requres a panel reset to clear
+bool silenced = false;
 bool keyInserted = false; //if the control panel has a key inserted
 bool horn = false; //bool to control if the horns are active
 bool strobe = false; //bool to control if the strobes are active
 bool trouble = false; //bool to control if the panel is in trouble
 bool troubleAck = false; //bool to control if the trouble is acknowledged
+bool configMenu = false; //determine if the control panel is in the configuration menu
+bool resetPressed = false;
+bool silencePressed = false; //make sure that presses don't count more than once
+bool drillPressed = false;
+bool resetStillPressed = false;
+bool silenceStillPressed = false; //make sure that presses don't count more than once
+bool drillStillPressed = false;
+bool updateScreen = false; //updating the screen in the config menu
 int verification = 0; //number to keep track of ms for verification
 int drill = 0; //number to keep track of ms for drill
 int codeWheelTimer = 0; //code wheel timing variable
@@ -17,12 +26,20 @@ int troubleLedTimer = 0; //number to keep track of ms for trouble light
 int alarmLedTimer = 0; //alarm led timer
 int troubleType = 0; //trouble type 0 - general, 1 - eol resistor
 int lcdUpdateTimer = 0; //update delay
-int currentScreen = 0; //update display if previous screen is not the same
+int currentScreen = -1; //update display if previous screen is not the same
+String configTop; //configuration menu strings for lcd
+String configBottom;
+String currentConfigTop; //configuration menu strings for current lcd display
+String currentConfigBottom;
 
 //CONFIG VARIABLES
 bool keyRequired = true; //determine if key switch is required to operate buttons
 bool isVerification = true; //is verification turned on
 bool eolResistor = true; //is the EOL resistor enabled
+bool preAlarm = false; //use pre-alarm?
+bool smokeDetectorPreAlarm = false; //should smoke detectors activate first stage
+int smokeDetectorTimeout = 5; //how long should smoke detector pre-alarm wait before cancelling the pre-alarm
+int firstStageTime = 1; //time in minutes that first stage should last
 int codeWheel = 0; //which alarm pattern to use, code-3 default
 int verificationTime = 2500;
 int resistorLenience = 0;
@@ -56,14 +73,12 @@ void setup() {
 
   Serial.println("Initializing LCD...");
   lcd.init(); //initialize LCD
-  lcd.clear();
   lcd.backlight();
-  lcd.setCursor(3,0);
+  lcd.clear();
+  lcd.setCursor(4,0);
   lcd.print("Booting...");
 
   Serial.println("Configured all pins");
-  
-
   
 
   EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
@@ -96,7 +111,7 @@ void setup() {
     EEPROM.write(74,0); //pre-alarm disabled by default
     EEPROM.write(75,1); //pre-alarm first-stage is 1 minute by default
     EEPROM.write(76,0); //smoke detector pre-alarm is disable by default
-    EEPROM.write(77,1); //smoke detector timeout
+    EEPROM.write(77,5); //smoke detector timeout is five minutes by default
     EEPROM.write(78,0); //homescreen is panel name by default
 
 
@@ -131,6 +146,18 @@ void setup() {
   } else {
     eolResistor = false;
   }
+  if (EEPROM.read(74) == 1){
+    preAlarm = true;
+  } else {
+    preAlarm = false;
+  }
+  if (EEPROM.read(76) == 1){
+    smokeDetectorPreAlarm = true;
+  } else {
+    smokeDetectorPreAlarm = false;
+  }
+  smokeDetectorTimeout = EEPROM.read(77)*60000;
+  firstStageTime = EEPROM.read(75)*60000;
   verificationTime = EEPROM.read(10)*100;
   resistorLenience = EEPROM.read(72);
   panelHomescreen = EEPROM.read(78);
@@ -138,14 +165,13 @@ void setup() {
       if (EEPROM.read(i) != 0){
         panelName = panelName + (char)EEPROM.read(i);
       }
-      Serial.println(panelName);
     }
 
   Serial.println("Config loaded");
   digitalWrite(27, HIGH); //power on ready LED on startup
   digitalWrite(26, LOW);
   digitalWrite(25, LOW);
-  digitalWrite(14, LOW); //smoke relay
+  digitalWrite(14, LOW); //turn on smoke relay
 }
 
 void tone() {
@@ -159,6 +185,17 @@ void noTone() {
   ledcWriteTone(0, 0); // stop tone
 }
 
+void activateNAC(){
+  horn = true;
+  strobe = true;
+  fullAlarm = true;
+  silenced = false;
+  configMenu = false;
+  tone();
+  digitalWrite(25, HIGH);
+  digitalWrite(26, LOW);
+}
+
 void checkKey(){
   if (digitalRead(33) == HIGH){
     keyInserted = true;
@@ -169,16 +206,13 @@ void checkKey(){
 
 void checkDevices(){
 
-  if (analogRead(15) <= resistorLenience and horn != true){
+  if (analogRead(15) <= resistorLenience and horn != true and silenced==false){
     verification++;
   } else {
     verification = 0;
   }
   if (verification == verificationTime or isVerification == false){ //activate the horns and strobes after verification
-    horn = true;
-    strobe = true;
-    fullAlarm = true;
-    tone();
+    activateNAC();
   } else if (analogRead(15) == 4095 and eolResistor == true) {
     trouble = true;
     troubleType=1;
@@ -215,7 +249,7 @@ void troubleCheck(){
 void checkButtons(){
   if (digitalRead(32) == HIGH){ //RESET BUTTON
     lcd.clear();
-    lcd.setCursor(0,0);
+    lcd.setCursor(2,0);
     lcd.print("Resetting...");
     tone();
     digitalWrite(27, HIGH); //ready LED
@@ -226,6 +260,9 @@ void checkButtons(){
     digitalWrite(14, HIGH); //smoke relay
     delay(2500);
     noTone();
+    digitalWrite(27, LOW); //ready LED
+    digitalWrite(26, LOW); //silence LED
+    digitalWrite(25, LOW); //alarm LED  
     ESP.restart();
   }
 
@@ -234,25 +271,29 @@ void checkButtons(){
       digitalWrite(26, HIGH);
       digitalWrite(25, LOW);
       horn = false;
-    } else if (horn == false and strobe == true){ //if the horns are silenced and the button is pressed again, silence the buzzer
+      silenced=true;
       noTone();
-    } else if (horn == false and strobe == false and trouble == true){
+    } else if (horn == false and strobe == false and trouble == true and silencePressed == false and troubleAck==false){
       troubleAck = true;
       noTone();
+    } else if (horn == false and strobe == false and fullAlarm == false and silencePressed == false and configMenu == false){
+      configMenu = true;
     }
+    silencePressed = true;
+  } else {
+    silencePressed = false;
   }
 
   if (digitalRead(34) == HIGH and horn != true){ //DRILL BUTTON
     if (drill == 2000){
-      horn = true;
-      strobe = true;
-      fullAlarm = true;
-      tone();
+      activateNAC();
     } else {
       drill++;
     }
+    drillPressed = true;
   } else {
     drill = 0;
+    drillPressed = false;
   }
 }
 
@@ -347,7 +388,7 @@ void alarm(){
         digitalWrite(13, LOW);
       } else if (codeWheelTimer == 10000){
         digitalWrite(13, HIGH);
-      } else if (codeWheelTimer == 5000){
+      } else if (codeWheelTimer == 15000){
         codeWheelTimer = -1;
       }
 
@@ -356,11 +397,11 @@ void alarm(){
     codeWheelTimer++;
     alarmLedTimer++;
     if (alarmLedTimer >= 750){
-      if (digitalRead(25) == true){
-        digitalWrite(25, LOW);
+      if (digitalRead(25) == false){
+        digitalWrite(25, HIGH);
         alarmLedTimer = 0;
       } else {
-        digitalWrite(25, HIGH);
+        digitalWrite(25, LOW);
         alarmLedTimer = 0;
       }
     }
@@ -371,7 +412,8 @@ void alarm(){
 }
 
 void lcdUpdate(){
-  if (trouble==false and fullAlarm==false and horn==false and strobe==false){
+  if (trouble==false and fullAlarm==false and horn==false and strobe==false and currentScreen != 0){
+      lcd.noAutoscroll();
       lcd.clear();
       lcd.setCursor(2,0);
       lcd.print("System Normal");
@@ -386,39 +428,118 @@ void lcdUpdate(){
     if (troubleType == 0 and currentScreen != 1){
       lcd.clear();
       lcd.setCursor(1,0);
-      lcd.print("*** Trouble ***");
+      lcd.print("* Trouble *");
       lcd.setCursor(2,1);
       lcd.print("Unknown Trouble");
       currentScreen = 1;
     } else if (troubleType == 1 and currentScreen != 2){
       lcd.clear();
       lcd.setCursor(1,0);
-      lcd.print("*** Trouble ***");
+      lcd.print("* Trouble *");
       lcd.setCursor(2,0);
       lcd.print("Device removed or EOL resistor not installed");
+      lcd.autoscroll();
       currentScreen = 2;
-    } else if (fullAlarm == true and currentScreen != 3){
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("*** FIRE ALARM ***");
-      lcd.setCursor(2,1);
-      lcd.print("Zone 1");
-      currentScreen = 3;
     }
+  } else if (fullAlarm == true and silenced == false and currentScreen != 3){
+    lcd.clear();
+    lcd.setCursor(1,0);
+    lcd.print("* FIRE ALARM *");
+    // lcd.setCursor(2,1);
+    // lcd.print("Zone 1");
+    currentScreen = 3;
+  } else if (silenced == true and currentScreen != 4){
+    lcd.clear();
+    lcd.setCursor(1,0);
+    lcd.print("* FIRE ALARM *");
+    lcd.setCursor(1,1);
+    lcd.print("-- SILENCED --");
+    // lcd.setCursor(2,1);
+    // lcd.print("Zone 1");
+    currentScreen = 4;
+  }
+}
+void config(){
+  char *main[] = {"Testing","Settings"};
+  char *mainTesting[] = {"Walk Test","Silent Walk Test","Strobe Test","Automatic System Test"};
+  char *mainSettings[] = {"Fire Alarm Settings","Panel Settings"};
+  char *mainSettingsFireAlarmSettings[] = {"Coding: ","Verification Settings","Pre-Alarm Settings","Audible Silence: "};
+  char *mainSettingsVerificationSettings[] = {"Verification: ","Verification Time: "};
+  char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slower Marchtime"};
+  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","First Stage Time: ","Smoke Detector Pre-Alarm Settings"};
+  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Smoke Detector Pre-Alarm: ","Smoke Detector Starts First Stage: ","Smoke Detector Timeout: "};
+  char *mainPanelSettings[] = {"Panel Name","Panel Security: ","Homescreen","LCD Timeout: "};
+  char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"};
+  char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"};
+  char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"};
+  if (digitalRead(32) == HIGH){ //RESET BUTTON
+    resetPressed = true;
+  } else {
+    resetPressed = false;
+    resetStillPressed = false;
+  }
+  if (digitalRead(35) == HIGH){ //SILENCE BUTTON
+    silencePressed = true;
+  } else {
+    silencePressed = false;
+    silenceStillPressed = false;
+  }
+  if (digitalRead(34) == HIGH){ //DRILL BUTTON
+    drillPressed = true;
+  } else {
+    drillPressed = false;
+    drillStillPressed = false;
+  }
+
+  
+  configTop = (String)main[0];
+  configBottom = (String)main[1];
+
+  // char buffer1[configTop.length()];
+  // char buffer2[configBottom.length()];
+  // configTop.toCharArray(buffer1,configTop.length());
+  // configBottom.toCharArray(buffer2,configBottom.length());
+
+
+  if (configTop != currentConfigTop or configBottom != currentConfigBottom){
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("> " + configTop);
+    lcd.setCursor(0,1);
+    lcd.print(configBottom);
+    currentConfigTop = configTop;
+    currentConfigBottom = configBottom;
+  
+  }
+
+
+
+  if (digitalRead(32) == HIGH){ //RESET BUTTON
+    resetStillPressed = true;
+  }
+  if (digitalRead(35) == HIGH){ //SILENCE BUTTON
+    silenceStillPressed = true;
+  }
+  if (digitalRead(34) == HIGH){ //DRILL BUTTON
+    drillStillPressed = true;
   }
 }
 void loop() {
   delay(1);
   checkKey(); //check to see if the key is inserted
   checkDevices(); //check pull stations and smoke detectors
-  if (keyInserted == true or keyRequired == false){
+  if ((keyInserted == true or keyRequired == false) and configMenu == false){
     checkButtons(); //check if certain buttons are pressed
   }
   troubleCheck(); //trouble check
   alarm(); //alarm codewheel
-  if (lcdUpdateTimer == 1000){
+  if (configMenu==false){
     lcdUpdate();
     lcdUpdateTimer=0;
+  } else if (configMenu==true) {
+    if (keyInserted == true or keyRequired == false){
+      config();
+    }
   } else {
     lcdUpdateTimer++;
   }
