@@ -19,15 +19,24 @@ bool resetStillPressed = false;
 bool silenceStillPressed = false; //make sure that presses don't count more than once
 bool drillStillPressed = false;
 bool updateScreen = false; //updating the screen in the config menu
+bool possibleAlarm = false; //panel receieved 0 from pull station ciruit and is now investigating
+bool definiteAlarm = false; //panel has investigated and determined that it was not a fluke
+bool walkTest = false; //is the system in walk test
+bool silentWalkTest = false;
 int verification = 0; //number to keep track of ms for verification
 int drill = 0; //number to keep track of ms for drill
+int troubleTimer = 0; //ms for trouble
 int codeWheelTimer = 0; //code wheel timing variable
 int troubleLedTimer = 0; //number to keep track of ms for trouble light
 int alarmLedTimer = 0; //alarm led timer
 int troubleType = 0; //trouble type 0 - general, 1 - eol resistor
 int lcdUpdateTimer = 0; //update delay
+int walkTestSmokeDetectorTimer = 0;
 int currentScreen = -1; //update display if previous screen is not the same
 int configPage = 0; //config page for the config menu
+int cursorPosition = 0; //which menu item the cursor is over
+int zerosCounted = 0; //verification variable
+int walkTestCount = 0; //keep track of walk test activations
 String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
@@ -107,7 +116,7 @@ void setup() {
     for (int i=25; i<=71; i++){ //write all 0's from 25-71 address
       EEPROM.write(i,0);
     }
-    EEPROM.write(72,0); //EOL lenience 0 by default
+    EEPROM.write(72,125); //EOL lenience 500 by default
     EEPROM.write(73,1); //EOL resistor is enabled by default
     EEPROM.write(74,0); //pre-alarm disabled by default
     EEPROM.write(75,1); //pre-alarm first-stage is 1 minute by default
@@ -160,7 +169,7 @@ void setup() {
   smokeDetectorTimeout = EEPROM.read(77)*60000;
   firstStageTime = EEPROM.read(75)*60000;
   verificationTime = EEPROM.read(10)*100;
-  resistorLenience = EEPROM.read(72);
+  resistorLenience = EEPROM.read(72)*4;
   panelHomescreen = EEPROM.read(78);
   for (int i=11; i<=71; i++){ //read panel name
       if (EEPROM.read(i) != 0){
@@ -206,19 +215,69 @@ void checkKey(){
 }
 
 void checkDevices(){
+  
+  if (walkTest == 0){
+    if (analogRead(15) == 0 and horn != true and silenced==false){
+      possibleAlarm = true;
+    } 
 
-  if (analogRead(15) <= resistorLenience and horn != true and silenced==false){
-    verification++;
-  } else {
-    verification = 0;
+    if (possibleAlarm == true and horn != true and strobe != true and silenced==false and isVerification == true){ //verification code
+      if (analogRead(15) == 0){
+        zerosCounted++;
+      }
+      if (verification >= verificationTime){
+        if (zerosCounted > 0.1*verificationTime and analogRead(15) == 0){
+          definiteAlarm = true;
+          possibleAlarm = false;
+          zerosCounted = 0;
+          verification = 0;
+        } else {
+          zerosCounted = 0;
+          possibleAlarm = false;
+          verification = 0;
+        }
+      } else {
+        verification++;
+      }
+    }
+  } else if (walkTest == true){
+    if (analogRead(15) == 0){
+      walkTestCount++;
+      walkTestSmokeDetectorTimer = 0;
+      while (analogRead(15) <= resistorLenience) {
+        digitalWrite(18, LOW);
+        if (silentWalkTest == false){
+          digitalWrite(13, LOW);
+        }
+        digitalWrite(25, HIGH);
+        walkTestSmokeDetectorTimer++;
+        if (walkTestSmokeDetectorTimer >= 5000){
+          digitalWrite(14, HIGH);
+        }
+        delay(1);
+      }
+      digitalWrite(18, HIGH);
+      if (silentWalkTest == false){
+        digitalWrite(13, HIGH);
+      }
+      digitalWrite(25, LOW);
+      currentScreen = -1;
+      delay(250);
+      digitalWrite(14, LOW);
+    }
   }
-  if (verification == verificationTime or isVerification == false){ //activate the horns and strobes after verification
+
+  if (definiteAlarm == true or (isVerification == false and analogRead(15) <= resistorLenience and horn != true and silenced==false)){ //activate the horns and strobes after verification
     activateNAC();
-  } else if (analogRead(15) == 4095 and eolResistor == true) {
+    definiteAlarm = false;
+  } else if (analogRead(15) == 4095 and eolResistor == true and troubleTimer == 2000) {
     trouble = true;
     troubleType=1;
+  } else if (analogRead(15) == 4095 and eolResistor == true and troubleTimer <= 2000){
+    troubleTimer++;
+  } else {
+    troubleTimer = 0;
   }
-
 }
 
 void troubleCheck(){
@@ -239,7 +298,9 @@ void troubleCheck(){
 
     troubleLedTimer++;
   } else {
-    digitalWrite(27, HIGH);
+    if (walkTest == false){
+      digitalWrite(27, HIGH);
+    }
     if (troubleLedTimer != 0){
       noTone();
     }
@@ -282,6 +343,11 @@ void checkButtons(){
       resetStillPressed = true; //make sure the menu doesn't close out as soon as someone opens it
       silenceStillPressed = true;
       drillStillPressed = true;
+      char *main[] = {"Testing","Settings"}; //menu   0
+      configTop = (String)main[0];
+      configBottom = (String)main[1];
+      configPage = 0;
+      cursorPosition = 0;
       currentConfigBottom = "";
       currentConfigTop = "";
     }
@@ -418,7 +484,7 @@ void alarm(){
 }
 
 void lcdUpdate(){
-  if (trouble==false and fullAlarm==false and horn==false and strobe==false and currentScreen != 0){
+  if (trouble==false and fullAlarm==false and horn==false and strobe==false and walkTest == false and currentScreen != 0){
       lcd.noAutoscroll();
       lcd.clear();
       lcd.setCursor(2,0);
@@ -436,14 +502,14 @@ void lcdUpdate(){
       lcd.setCursor(1,0);
       lcd.print("* Trouble *");
       lcd.setCursor(2,1);
-      lcd.print("Unknown Trouble");
+      lcd.print("Unknown");
       currentScreen = 1;
     } else if (troubleType == 1 and currentScreen != 2){
       lcd.clear();
-      lcd.setCursor(1,0);
+      lcd.setCursor(0,0);
       lcd.print("* Trouble *");
-      lcd.setCursor(2,0);
-      lcd.print("Device removed or EOL resistor not installed");
+      lcd.setCursor(0,0);
+      lcd.print("Ground Fault");
       lcd.autoscroll();
       currentScreen = 2;
     }
@@ -463,13 +529,25 @@ void lcdUpdate(){
     // lcd.setCursor(2,1);
     // lcd.print("Zone 1");
     currentScreen = 4;
+  } else if (walkTest == true and currentScreen != 5) {
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("* Supervisory *");
+    lcd.setCursor(0,1);
+    if (silentWalkTest == false){
+      lcd.print("Walk Test - "+(String)walkTestCount);
+    } else {
+      lcd.print("S. Wlk Test - "+(String)walkTestCount);
+    }
+    currentScreen = 5;
+    digitalWrite(27, LOW); //ready led off for walk test
   }
 }
 void config(){
   char *main[] = {"Testing","Settings"}; //menu 0
-  char *mainTesting[] = {"Walk Test","Silent Walk Test","Strobe Test","Automatic System Test"}; //menu 1
-  char *mainSettings[] = {"Fire Alarm Settings","Panel Settings"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding: ","Verification Settings","Pre-Alarm Settings","Audible Silence: "}; //menu 3
+  char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test","Auto Sys Test"}; //menu 1
+  char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
+  char *mainSettingsFireAlarmSettings[] = {"Coding: ","Verification","Pre-Alarm","Audible Silence: "}; //menu 3
   char *mainSettingsVerificationSettings[] = {"Verification: ","Verification Time: "}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slower Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","First Stage Time: ","Smoke Detector Pre-Alarm Settings"}; //menu 6
@@ -498,26 +576,96 @@ void config(){
   }
 
   if (configPage == 0){
-    configTop = (String)main[0];
-    configBottom = (String)main[1];
-    if (silencePressed == true and silenceStillPressed == false){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){ //main screen
+        cursorPosition = 1;
+        configTop = (String)main[1];
+        configBottom = (String)main[0];
+      } else if (cursorPosition == 1){
+        cursorPosition = 0;
+        configTop = (String)main[0];
+        configBottom = (String)main[1];
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
       silencePressed = true;
       configMenu = false;
       currentScreen=-1;
+    } else if (drillPressed == true and drillStillPressed == false){
+      if (cursorPosition == 0){ //cursor over testing
+        configPage = 1; //change screen to testing
+        cursorPosition = 0;
+        configTop = (String)mainTesting[0];
+        configBottom = (String)mainTesting[1];
+      } else if (cursorPosition == 1){ //cursor over settings
+        configPage = 2; //change screen to settings
+        cursorPosition = 0;
+        configTop = (String)mainSettings[0];
+        configBottom = (String)mainSettings[1];
+      }
+    }
+  } else if (configPage == 1){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){
+        cursorPosition = 1;
+        configTop = (String)mainTesting[1];
+        configBottom = (String)mainTesting[2];
+      } else if (cursorPosition == 1) {
+        cursorPosition = 2;
+        configTop = (String)mainTesting[2];
+        configBottom = (String)mainTesting[3];
+      } else if (cursorPosition == 2) {
+        cursorPosition = 3;
+        configTop = (String)mainTesting[3];
+        configBottom = (String)mainTesting[0];
+      } else if (cursorPosition == 3) {
+        cursorPosition = 0;
+        configTop = (String)mainTesting[0];
+        configBottom = (String)mainTesting[1];
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 0;
+      cursorPosition = 0;
+      configTop = (String)main[0];
+      configBottom = (String)main[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+        if (cursorPosition == 0){
+          walkTest = true;
+          silentWalkTest = false;
+          silencePressed = true;
+          configMenu = false;
+          currentScreen=-1;
+          walkTestCount = 0;
+        } else if (cursorPosition == 1) {
+          walkTest = true;
+          silentWalkTest = true;
+          silencePressed = true;
+          configMenu = false;
+          currentScreen=-1;
+          walkTestCount = 0;
+        } else if (cursorPosition == 2) {
+          if (strobe == false){
+            strobe = true;
+          } else {
+            strobe = false;
+          }
+        } else if (cursorPosition == 3) {
+          
+        }
     }
   }
   
+  // if (resetPressed == true and resetStillPressed == false){
 
-  // char buffer1[configTop.length()];
-  // char buffer2[configBottom.length()];
-  // configTop.toCharArray(buffer1,configTop.length());
-  // configBottom.toCharArray(buffer2,configBottom.length());
+  // } else if (silencePressed == true and silenceStillPressed == false){
 
+  // } else if (drillPressed == true and drillStillPressed == false){
+  
+  // }
 
   if (configTop != currentConfigTop or configBottom != currentConfigBottom){
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("> " + configTop);
+    lcd.print("]" + configTop);
     lcd.setCursor(0,1);
     lcd.print(configBottom);
     currentConfigTop = configTop;
@@ -548,16 +696,11 @@ void loop() {
   alarm(); //alarm codewheel
   if (configMenu==false){
     lcdUpdate();
-    // lcdUpdateTimer=0;
   } else if (configMenu==true) {
     if (keyInserted == true or keyRequired == false){
       config();
     }
-  } 
-  // else {
-  //   lcdUpdateTimer++;
-  // }
-  
+  }
 }
 
 
