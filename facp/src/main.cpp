@@ -23,6 +23,9 @@ bool possibleAlarm = false; //panel receieved 0 from pull station ciruit and is 
 bool definiteAlarm = false; //panel has investigated and determined that it was not a fluke
 bool walkTest = false; //is the system in walk test
 bool silentWalkTest = false;
+int characters[] = {32,45,46,47,48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90}; //characters allowed on name
+int panelNameList[16];
+int clearTimer = 0; //timer for keeping track of button holding for clearing character in the name editor
 int verification = 0; //number to keep track of ms for verification
 int drill = 0; //number to keep track of ms for drill
 int troubleTimer = 0; //ms for trouble
@@ -48,6 +51,7 @@ bool isVerification = true; //is verification turned on
 bool eolResistor = true; //is the EOL resistor enabled
 bool preAlarm = false; //use pre-alarm?
 bool smokeDetectorPreAlarm = false; //should smoke detectors activate first stage
+bool audibleSilence = true;
 int smokeDetectorTimeout = 5; //how long should smoke detector pre-alarm wait before cancelling the pre-alarm
 int firstStageTime = 1; //time in minutes that first stage should last
 int codeWheel = 0; //which alarm pattern to use, code-3 default
@@ -94,12 +98,12 @@ void setup() {
   EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
   Serial.println("Configured EEPROM for addresses 0-1024");
 
-  EEPROM.write(0,255); //TESTING PURPOSES
-  EEPROM.commit(); //TESTING PURPOSES
+  // EEPROM.write(0,255); //TESTING PURPOSES
+  // EEPROM.commit(); //TESTING PURPOSES
 
   Serial.println("Verifying EEPROM configuration integrity...");
 
-  if (EEPROM.read(0) != 76 or EEPROM.read(6) != 104 or EEPROM.read(7) > 3 or EEPROM.read(8) > 1){ //EEPROM verification, check essential-to-run components, listing all conditions that cannot exist in a correct EEPROM
+  if (EEPROM.read(0) != 76 or EEPROM.read(6) != 104 or EEPROM.read(7) > 5 or EEPROM.read(8) > 1){ //EEPROM verification, check essential-to-run components, listing all conditions that cannot exist in a correct EEPROM
     Serial.println("EEPROM verification failed. Re-writing EEPROM");
     for (int i=0; i<=1024; i++){ //write all 255's from 0-1024 address
       EEPROM.write(i,255);
@@ -111,9 +115,9 @@ void setup() {
     EEPROM.write(9,1); //verification is turned on by default
     EEPROM.write(10,25); //default verification time of 2.5 seconds
 
-    //system name "[DEFAULT NAME]"
-    EEPROM.write(11,91);EEPROM.write(12,68);EEPROM.write(13,69);EEPROM.write(14,70);EEPROM.write(15,65);EEPROM.write(16,85);EEPROM.write(17,76);EEPROM.write(18,84);EEPROM.write(19,32);EEPROM.write(20,78);EEPROM.write(21,65);EEPROM.write(22,77);EEPROM.write(23,69);EEPROM.write(24,93);
-    for (int i=25; i<=71; i++){ //write all 0's from 25-71 address
+    //system name "DEFAULT NAME"
+    EEPROM.write(11,68);EEPROM.write(12,69);EEPROM.write(13,70);EEPROM.write(14,65);EEPROM.write(15,85);EEPROM.write(16,76);EEPROM.write(17,84);EEPROM.write(18,32);EEPROM.write(19,78);EEPROM.write(20,65);EEPROM.write(21,77);EEPROM.write(22,69);EEPROM.write(23,32);EEPROM.write(24,32);EEPROM.write(25,32);EEPROM.write(26,32);
+    for (int i=27; i<=71; i++){ //write all 0's from 23-71 address
       EEPROM.write(i,0);
     }
     EEPROM.write(72,125); //EOL lenience 500 by default
@@ -123,6 +127,7 @@ void setup() {
     EEPROM.write(76,0); //smoke detector pre-alarm is disable by default
     EEPROM.write(77,5); //smoke detector timeout is five minutes by default
     EEPROM.write(78,0); //homescreen is panel name by default
+    EEPROM.write(79,1); //audible silence is enabled by default
 
 
 
@@ -166,17 +171,24 @@ void setup() {
   } else {
     smokeDetectorPreAlarm = false;
   }
+  if (EEPROM.read(79) == 1){
+    audibleSilence = true;
+  } else {
+    audibleSilence = false;
+  }
   smokeDetectorTimeout = EEPROM.read(77)*60000;
   firstStageTime = EEPROM.read(75)*60000;
   verificationTime = EEPROM.read(10)*100;
   resistorLenience = EEPROM.read(72)*4;
   panelHomescreen = EEPROM.read(78);
+  int x=0;
   for (int i=11; i<=71; i++){ //read panel name
-      if (EEPROM.read(i) != 0){
-        panelName = panelName + (char)EEPROM.read(i);
-      }
+    if (EEPROM.read(i) != 0){
+      panelName = panelName + (char)EEPROM.read(i);
+      panelNameList[x] = EEPROM.read(i);
+      x++;
     }
-
+  }
   Serial.println("Config loaded");
   digitalWrite(27, HIGH); //power on ready LED on startup
   digitalWrite(26, LOW);
@@ -217,7 +229,7 @@ void checkKey(){
 void checkDevices(){
   
   if (walkTest == 0){
-    if (analogRead(15) == 0 and horn != true and silenced==false){
+    if (analogRead(15) <= resistorLenience and horn != true and silenced==false){
       possibleAlarm = true;
     } 
 
@@ -333,6 +345,9 @@ void checkButtons(){
       digitalWrite(26, HIGH);
       digitalWrite(25, LOW);
       horn = false;
+      if (audibleSilence == false){
+        strobe = false;
+      }
       silenced=true;
       noTone();
     } else if (horn == false and strobe == false and trouble == true and silencePressed == false and troubleAck==false){
@@ -545,17 +560,19 @@ void lcdUpdate(){
 }
 void config(){
   char *main[] = {"Testing","Settings"}; //menu 0
-  char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test","Auto Sys Test"}; //menu 1
+  char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding: ","Verification","Pre-Alarm","Audible Silence: "}; //menu 3
-  char *mainSettingsVerificationSettings[] = {"Verification: ","Verification Time: "}; //menu 4
-  char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slower Marchtime"}; //menu 5
-  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","First Stage Time: ","Smoke Detector Pre-Alarm Settings"}; //menu 6
-  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Smoke Detector Pre-Alarm: ","Smoke Detector Starts First Stage: ","Smoke Detector Timeout: "}; //menu 7
-  char *mainPanelSettings[] = {"Panel Name","Panel Security: ","Homescreen","LCD Timeout: "}; //menu 8
+  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.: "}; //menu 3
+  char *mainSettingsVerificationSettings[] = {"Verification: ","Verif. Time"}; //menu 4
+  char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
+  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","stage 1: ","Detector PreAlrm"}; //menu 6
+  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Tmeout: "}; //menu 7
+  char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Timeout: ","Factory Reset"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
-  char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
-  char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"}; //menu 11
+  char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
+  
+  // char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
+  // char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"}; //menu 11
   if (digitalRead(32) == HIGH){ //RESET BUTTON
     resetPressed = true;
   } else {
@@ -574,7 +591,6 @@ void config(){
     drillPressed = false;
     drillStillPressed = false;
   }
-
   if (configPage == 0){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){ //main screen
@@ -612,12 +628,8 @@ void config(){
       } else if (cursorPosition == 1) {
         cursorPosition = 2;
         configTop = (String)mainTesting[2];
-        configBottom = (String)mainTesting[3];
-      } else if (cursorPosition == 2) {
-        cursorPosition = 3;
-        configTop = (String)mainTesting[3];
         configBottom = (String)mainTesting[0];
-      } else if (cursorPosition == 3) {
+      } else if (cursorPosition == 2) {
         cursorPosition = 0;
         configTop = (String)mainTesting[0];
         configBottom = (String)mainTesting[1];
@@ -627,6 +639,7 @@ void config(){
       cursorPosition = 0;
       configTop = (String)main[0];
       configBottom = (String)main[1];
+      strobe = false;
     } else if (drillPressed == true and drillStillPressed == false){
         if (cursorPosition == 0){
           walkTest = true;
@@ -645,12 +658,287 @@ void config(){
         } else if (cursorPosition == 2) {
           if (strobe == false){
             strobe = true;
+            configTop = (String)mainTesting[2]+" *";
           } else {
             strobe = false;
+            configTop = (String)mainTesting[2];
           }
-        } else if (cursorPosition == 3) {
-          
         }
+    }
+  } else if (configPage == 2){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){ //main screen
+        cursorPosition = 1;
+        configTop = (String)mainSettings[1];
+        configBottom = (String)mainSettings[0];
+      } else if (cursorPosition == 1){
+        cursorPosition = 0;
+        configTop = (String)mainSettings[0];
+        configBottom = (String)mainSettings[1];
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 0;
+      cursorPosition = 0;
+      configTop = (String)main[0];
+      configBottom = (String)main[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      if (cursorPosition == 0){
+        configPage = 3; //change screen to facp settings
+        cursorPosition = 0;
+        configTop = (String)mainSettingsFireAlarmSettings[0];
+        configBottom = (String)mainSettingsFireAlarmSettings[1];
+      } else if (cursorPosition == 1){
+        configPage = 8; //change screen to facp settings
+        cursorPosition = 0;
+        configTop = (String)mainPanelSettings[0];
+        configBottom = (String)mainPanelSettings[1];
+      }
+    }
+  } else if (configPage == 3){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){
+        cursorPosition = 1;
+        configTop = (String)mainSettingsFireAlarmSettings[1];
+        configBottom = (String)mainSettingsFireAlarmSettings[2];
+      } else if (cursorPosition == 1) {
+        cursorPosition = 2;
+        configTop = (String)mainSettingsFireAlarmSettings[2];
+        configBottom = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
+      } else if (cursorPosition == 2) {
+        cursorPosition = 3;
+        configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
+        configBottom = (String)mainSettingsFireAlarmSettings[0];
+      } else if (cursorPosition == 3) {
+        cursorPosition = 0;
+        configTop = (String)mainSettingsFireAlarmSettings[0];
+        configBottom = (String)mainSettingsFireAlarmSettings[1];
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 2;
+      cursorPosition = 0;
+      configTop = (String)mainSettings[0];
+      configBottom = (String)mainSettings[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      if (cursorPosition == 0){
+        configPage = 5;
+        cursorPosition = 0;
+        
+        if (codeWheel == 0){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[0] + "*";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[0];
+        }
+        if (codeWheel == 1){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[1] + "*";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[1];
+        }
+      } else if (cursorPosition == 1) {
+        configPage = 4;
+        cursorPosition = 0;
+        configTop = (String)mainSettingsVerificationSettings[0];
+        configBottom = (String)mainSettingsVerificationSettings[1];
+      } else if (cursorPosition == 2) {
+        configPage = 6;
+        cursorPosition = 0;
+        configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0];
+        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1];
+      } else if (cursorPosition == 3) {
+        if (audibleSilence == true){
+          audibleSilence = false;
+          EEPROM.write(79,0);
+        } else {
+          audibleSilence = true;
+          EEPROM.write(79,1);
+        }
+        EEPROM.commit();
+        configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
+        configBottom = (String)mainSettingsFireAlarmSettings[0];
+      }
+    }
+  } else if (configPage == 8){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){
+        cursorPosition = 1;
+        configTop = (String)mainPanelSettings[1];
+        configBottom = (String)mainPanelSettings[2];
+      } else if (cursorPosition == 1) {
+        cursorPosition = 2;
+        configTop = (String)mainPanelSettings[2];
+        configBottom = (String)mainPanelSettings[3];
+      } else if (cursorPosition == 2) {
+        cursorPosition = 3;
+        configTop = (String)mainPanelSettings[3];
+        configBottom = (String)mainPanelSettings[0];
+      } else if (cursorPosition == 3) {
+        cursorPosition = 0;
+        configTop = (String)mainPanelSettings[0];
+        configBottom = (String)mainPanelSettings[1];
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 2;
+      cursorPosition = 0;
+      configTop = (String)mainSettings[0];
+      configBottom = (String)mainSettings[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      if (cursorPosition == 0){
+        configPage = 10;
+        cursorPosition = 0;
+        configTop = "Enter Name:";
+        configBottom = (String)panelName;
+        lcd.blink_on();
+
+      } else if (cursorPosition == 1) {
+
+      } else if (cursorPosition == 2) {
+
+      }
+    }
+  } else if (configPage == 10){
+    
+    if (resetPressed == true and resetStillPressed == false){
+      clearTimer = 0;
+      if (panelNameList[cursorPosition] == 90){
+        panelNameList[cursorPosition] = 32;
+      } else if (panelNameList[cursorPosition] == 32){
+        panelNameList[cursorPosition] = 39;
+      } else if (panelNameList[cursorPosition] == 39){
+        panelNameList[cursorPosition] = 45;
+      } else if (panelNameList[cursorPosition] == 57){
+        panelNameList[cursorPosition] = 65;
+      } else {
+        panelNameList[cursorPosition] = panelNameList[cursorPosition] + 1;
+      }
+    } else if (resetPressed==true and resetStillPressed==true) {
+      clearTimer++;
+      if (clearTimer >= 1000) {
+        panelNameList[cursorPosition] = 32;
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      int x=0;
+      for (int i=11; i<=26; i++){ //write new panel name
+        EEPROM.write(i,panelNameList[x]);
+        x++;
+      }
+      lcd.blink_off();
+      EEPROM.commit();
+      configPage = 8;
+      cursorPosition = 0;
+      configTop = (String)mainPanelSettings[0];
+      configBottom = (String)mainPanelSettings[1];
+      x=0;
+      panelName = "";
+      for (int i=11; i<=71; i++){ //read panel name
+        if (EEPROM.read(i) != 0){
+          panelName = panelName + (char)EEPROM.read(i);
+          panelNameList[x] = EEPROM.read(i);
+          x++;
+        }
+      }
+    } else if (drillPressed == true and drillStillPressed == false){
+      currentConfigTop = "bruh";
+      if (cursorPosition != 15){
+        cursorPosition++;
+      } else {
+        cursorPosition = 0;
+      }
+    }
+    if (configPage == 10){ //make sure the panel doesn't re-render the text on the previous page when exiting
+      configBottom = "";
+      for (int i=0; i<=15; i++){ //generate name to print on lcd
+        configBottom = configBottom + (char)panelNameList[i];
+      }
+    }
+  } else if (configPage == 5){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){
+        cursorPosition = 1;
+        if (codeWheel == 1){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[1]+"*";
+        } else{
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[1];
+        }
+        if (codeWheel == 2){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[2]+"*";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[2];
+        }
+      } else if (cursorPosition == 1) {
+        cursorPosition = 2;
+        if (codeWheel == 2){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[2]+"*";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[2];
+        }
+        if (codeWheel == 3){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[3]+"*";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[3];
+        }
+      } else if (cursorPosition == 2) {
+        cursorPosition = 3;
+        if (codeWheel == 3){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[3]+"*";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[3];
+        }
+        if (codeWheel == 4){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[4]+"*";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[4];
+        }
+      } else if (cursorPosition == 3) {
+        cursorPosition = 4;
+        if (codeWheel == 4){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[4]+"*";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[4];
+        }
+        if (codeWheel == 5){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[5]+"*";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[5];
+        }
+      } else if (cursorPosition == 4) {
+        cursorPosition = 5;
+        if (codeWheel == 5){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[5]+"*";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[5];
+        }
+        if (codeWheel == 0){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[0]+"*";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[0];
+        }
+      } else if (cursorPosition == 5) {
+        cursorPosition = 0;
+        if (codeWheel == 0){
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[0]+"*";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsCoding[0];
+        }
+        if (codeWheel == 1){
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[1]+"*";
+        } else{
+          configBottom = (String)mainSettingsFireAlarmSettingsCoding[1];
+        }
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 3; //change screen to facp settings
+      cursorPosition = 0;
+      configTop = (String)mainSettingsFireAlarmSettings[0];
+      configBottom = (String)mainSettingsFireAlarmSettings[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      EEPROM.write(7,cursorPosition);
+      EEPROM.commit();
+      configTop = (String)mainSettingsFireAlarmSettingsCoding[cursorPosition]+"*";
+      if (cursorPosition == 5){
+        configBottom = (String)mainSettingsFireAlarmSettingsCoding[0];
+      } else {
+        configBottom = (String)mainSettingsFireAlarmSettingsCoding[cursorPosition+1];
+      }
+      codeWheel = EEPROM.read(7); //codeWheel setting address
     }
   }
   
@@ -670,9 +958,12 @@ void config(){
     lcd.print(configBottom);
     currentConfigTop = configTop;
     currentConfigBottom = configBottom;
-  
+    if (configPage == 10){
+      lcd.setCursor(cursorPosition,1);
+    }
+    
   }
-
+  
 
 
   if (digitalRead(32) == HIGH){ //RESET BUTTON

@@ -4,7 +4,7 @@ Address allocation:
 8 | 0-1 - is a key required
 9 | 0-1 - is there verification
 10 | 1-255 - how long to do verification (value * 0.1 = actual verification time in seconds)
-11-71 | 65-90, 97-122, 45-57, 32 - System name
+11-71 | 65-90, 45-57, 32, 39 - System name
 72 | 0-4094 - EOL resistor lenience
 73 | 0-1 - enable EOL resistor
 74 | 0-1 - pre-alarm enabled
@@ -12,3 +12,4 @@ Address allocation:
 76 | 0-1 - smoke detector pre-alarm
 77 | 1-5 - smoke detector timeout
 78 | 0-1 - panel homescreen
+79 | 0-1 - audible silence
