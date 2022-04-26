@@ -13,3 +13,4 @@ Address allocation:
 77 | 1-5 - smoke detector timeout
 78 | 0-1 - panel homescreen
 79 | 0-1 - audible silence
+80 | 0-40 - lcd timeout
