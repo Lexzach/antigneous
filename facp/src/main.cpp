@@ -23,6 +23,7 @@ bool possibleAlarm = false; //panel receieved 0 from pull station ciruit and is 
 bool definiteAlarm = false; //panel has investigated and determined that it was not a fluke
 bool walkTest = false; //is the system in walk test
 bool silentWalkTest = false;
+bool backlightOn = true;
 int characters[] = {32,45,46,47,48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90}; //characters allowed on name
 int panelNameList[16];
 int clearTimer = 0; //timer for keeping track of button holding for clearing character in the name editor
@@ -1033,14 +1034,16 @@ void config(){
 }
 void loop() {
   if (lcdTimeout!=0){
-    if (lcdTimeout <= lcdTimeoutTimer){
+    if (lcdTimeout <= lcdTimeoutTimer and backlightOn == true){
       lcd.noBacklight();
-    } else {
+      backlightOn = false;
+    } else if (backlightOn == true) {
       lcdTimeoutTimer++;
     }
-    if (drillPressed == true or silencePressed == true or resetPressed == true or fullAlarm == true or trouble == true){
+    if ((drillPressed == true or silencePressed == true or resetPressed == true or fullAlarm == true or trouble == true) and backlightOn == false){
       lcdTimeoutTimer = 0;
       lcd.backlight();
+      backlightOn = true;
     }
   }
   delay(1);
