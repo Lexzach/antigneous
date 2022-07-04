@@ -3,6 +3,11 @@
 #include <LiquidCrystal_I2C.h>
 #include <string.h>
 
+char *firmwareRev = "1.1"; //VERSION
+int EEPROMVersion = 1; //version control to rewrite eeprom after update
+int EEPROMBuild = 1;
+
+
 //RUNTIME VARIABLES
 bool fullAlarm = false; //bool to control if this is a full alarm that requres a panel reset to clear
 bool silenced = false;
@@ -73,6 +78,14 @@ int buzzerPin = 4;
 int strobePin = 18;
 int smokeDetectorPin = 14;
 int readyLedPin = 27;
+int silenceLedPin = 26;
+int alarmLedPin = 25;
+int keySwitchPin = 33;
+int resetSwitchPin = 32;
+int silenceSwitchPin = 35;
+int drillSwitchPin = 34;
+int sclPin = 22;
+int sdaPin = 21;
 
 void resetEEPROM() {
   for (int i=0; i<=1024; i++){ //write all 255's from 0-1024 address
@@ -87,9 +100,12 @@ void resetEEPROM() {
 
     //system name "ANTIGNEOUS"
     EEPROM.write(11,65);EEPROM.write(12,78);EEPROM.write(13,84);EEPROM.write(14,73);EEPROM.write(15,71);EEPROM.write(16,78);EEPROM.write(17,69);EEPROM.write(18,79);EEPROM.write(19,85);EEPROM.write(20,83);
-    for (int i=21; i<=71; i++){ //write all 0's from 23-71 address
+    for (int i=21; i<=26; i++){ //write all 0's from 23-71 address
       EEPROM.write(i,0);
     }
+
+    EEPROM.write(50, EEPROMVersion); //write current version and build
+    EEPROM.write(51, EEPROMBuild); 
     EEPROM.write(72,125); //EOL lenience 500 by default (take the value stored and multiply by 4 to get actual value)
     EEPROM.write(73,1); //EOL resistor is enabled by default
     EEPROM.write(74,0); //pre-alarm disabled by default
@@ -112,24 +128,24 @@ void setup() {
   pinMode(hornPin, OUTPUT); //horn
   pinMode(strobePin, OUTPUT); //strobe
   pinMode(smokeDetectorPin, OUTPUT); //smoke relay
-  pinMode(readyLedPin, OUTPUT); //ready LED D
-  pinMode(26, OUTPUT); //silence LED D
-  pinMode(25, OUTPUT); //alarm LED D
-  pinMode(33, INPUT); //key switch D
-  pinMode(32, INPUT); //reset switch D
-  pinMode(35, INPUT); //silence switch D
-  pinMode(34, INPUT); //drill switch D
+  pinMode(readyLedPin, OUTPUT); //ready LED
+  pinMode(silenceLedPin, OUTPUT); //silence LED
+  pinMode(alarmLedPin, OUTPUT); //alarm LED
+  pinMode(keySwitchPin, INPUT); //key switch
+  pinMode(resetSwitchPin, INPUT); //reset switch
+  pinMode(silenceSwitchPin, INPUT); //silence switch
+  pinMode(resetSwitchPin, INPUT); //drill switch
   
   pinMode(zone1Pin, INPUT); //zone 1
   pinMode(zone2Pin, INPUT); //zone 2
 
-  pinMode(buzzerPin, OUTPUT); //buzzer D
+  pinMode(buzzerPin, OUTPUT); //buzzer
   digitalWrite(hornPin, HIGH); //horn
   digitalWrite(strobePin, HIGH); //strobe
   digitalWrite(smokeDetectorPin, HIGH); //smoke relay
   
-  pinMode(22, OUTPUT); //scl
-  pinMode(21, OUTPUT); //sda
+  pinMode(sclPin, OUTPUT); //scl
+  pinMode(sdaPin, OUTPUT); //sda
 
   Serial.println("Initializing LCD...");
   lcd.init(); //initialize LCD
@@ -144,12 +160,12 @@ void setup() {
   EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
   Serial.println("Configured EEPROM for addresses 0-1024");
 
-  // EEPROM.write(0,255); //TESTING PURPOSES
-  // EEPROM.commit(); //TESTING PURPOSES
+  // EEPROM.write(0,255); //UNCOMMENT TO INVALIDATE EEPROM AND REFLASH IT AFTER EVERY RESTART
+  // EEPROM.commit();
 
   Serial.println("Verifying EEPROM configuration integrity...");
 
-  if (EEPROM.read(0) != 76 or EEPROM.read(6) != 104 or EEPROM.read(7) > 5 or EEPROM.read(8) > 1){ //EEPROM verification, check essential-to-run components, listing all conditions that cannot exist in a correct EEPROM
+  if (EEPROM.read(0) != 76 or EEPROM.read(6) != 104 or EEPROM.read(7) > 5 or EEPROM.read(8) > 1 or EEPROM.read(50) != EEPROMVersion or EEPROM.read(51) != EEPROMBuild){ //EEPROM verification, check essential-to-run components, listing all conditions that cannot exist in a correct EEPROM
     Serial.println("EEPROM verification failed. Re-writing EEPROM");
     resetEEPROM();
   } else {
@@ -212,8 +228,8 @@ void setup() {
   }
   Serial.println("Config loaded");
   digitalWrite(readyLedPin, HIGH); //power on ready LED on startup
-  digitalWrite(26, LOW);
-  digitalWrite(25, LOW);
+  digitalWrite(silenceLedPin, LOW);
+  digitalWrite(alarmLedPin, LOW);
   digitalWrite(smokeDetectorPin, LOW); //turn on smoke relay
 }
 
@@ -237,12 +253,12 @@ void activateNAC(){
   silenced = false;
   configMenu = false;
   tone();
-  digitalWrite(25, HIGH);
-  digitalWrite(26, LOW);
+  digitalWrite(alarmLedPin, HIGH);
+  digitalWrite(silenceLedPin, HIGH);
 }
 
 void checkKey(){
-  if (digitalRead(33) == HIGH){
+  if (digitalRead(keySwitchPin) == HIGH){
     keyInserted = true;
   } else {
     keyInserted = false;
@@ -284,10 +300,10 @@ void checkDevices(){
         if (silentWalkTest == false){
           digitalWrite(hornPin, LOW);
         }
-        digitalWrite(25, HIGH);
+        digitalWrite(alarmLedPin, HIGH);
         walkTestSmokeDetectorTimer++;
         if (walkTestSmokeDetectorTimer >= 5000){
-          digitalWrite(14, HIGH);
+          digitalWrite(smokeDetectorPin, HIGH);
         }
         delay(1);
       }
@@ -295,7 +311,7 @@ void checkDevices(){
       if (silentWalkTest == false){
         digitalWrite(hornPin, HIGH);
       }
-      digitalWrite(25, LOW);
+      digitalWrite(alarmLedPin, HIGH);
       currentScreen = -1;
       delay(250);
       digitalWrite(smokeDetectorPin, LOW);
@@ -344,29 +360,29 @@ void troubleCheck(){
 }
 
 void checkButtons(){
-  if (digitalRead(32) == HIGH){ //RESET BUTTON
+  if (digitalRead(resetSwitchPin) == HIGH){ //RESET BUTTON
     lcd.clear();
     lcd.setCursor(2,0);
     lcd.print("Resetting...");
     tone();
     digitalWrite(readyLedPin, HIGH); //ready LED
-    digitalWrite(26, HIGH); //silence LED
-    digitalWrite(25, HIGH); //alarm LED  
+    digitalWrite(silenceLedPin, HIGH); //silence LED
+    digitalWrite(alarmLedPin, HIGH); //alarm LED
     digitalWrite(hornPin, HIGH); //horn
     digitalWrite(strobePin, HIGH); //strobe
-    digitalWrite(14, HIGH); //smoke relay
+    digitalWrite(smokeDetectorPin, HIGH); //smoke relay
     delay(2500);
     noTone();
     digitalWrite(readyLedPin, LOW); //ready LED
-    digitalWrite(26, LOW); //silence LED
-    digitalWrite(25, LOW); //alarm LED  
+    digitalWrite(silenceLedPin, HIGH); //silence LED
+    digitalWrite(alarmLedPin, HIGH); //alarm LED  
     ESP.restart();
   }
 
-  if (digitalRead(35) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceSwitchPin) == HIGH){ //SILENCE BUTTON
     if (horn == true){ //if horns are not silenced, silence the horns
-      digitalWrite(26, HIGH);
-      digitalWrite(25, LOW);
+      digitalWrite(silenceLedPin, HIGH);
+      digitalWrite(alarmLedPin, HIGH);
       horn = false;
       if (audibleSilence == false){
         strobe = false;
@@ -394,7 +410,7 @@ void checkButtons(){
     silencePressed = false;
   }
 
-  if (digitalRead(34) == HIGH and horn != true){ //DRILL BUTTON
+  if (digitalRead(drillSwitchPin) == HIGH and horn != true){ //DRILL BUTTON
     if (drill == 2000){
       activateNAC();
     } else {
@@ -508,10 +524,10 @@ void alarm(){
     alarmLedTimer++;
     if (alarmLedTimer >= 750){
       if (digitalRead(25) == false){
-        digitalWrite(25, HIGH);
+        digitalWrite(alarmLedPin, HIGH);
         alarmLedTimer = 0;
       } else {
-        digitalWrite(25, LOW);
+        digitalWrite(alarmLedPin, HIGH);
         alarmLedTimer = 0;
       }
     }
@@ -590,27 +606,27 @@ void config(){
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","stage 1: ","Detector PreAlrm"}; //menu 6
   char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Tmeout: "}; //menu 7
-  char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","Firmware Ver."}; //menu 8
+  char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
   char *mainPanelSettingsFactoryReset[] = {"Are you sure?"}; //menu 11
-  char *mainPanelSettingsAbout[] = {""}; //menu 12
+  char *mainPanelSettingsAbout[] = {"ANTIGNEOUS OS","Firmware:",firmwareRev,"by Lexzach"}; //menu 12
   
   // char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
   // char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"}; //menu 11
-  if (digitalRead(32) == HIGH){ //RESET BUTTON
+  if (digitalRead(resetSwitchPin) == HIGH){ //RESET BUTTON
     resetPressed = true;
   } else {
     resetPressed = false;
     resetStillPressed = false;
   }
-  if (digitalRead(35) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceSwitchPin) == HIGH){ //SILENCE BUTTON
     silencePressed = true;
   } else {
     silencePressed = false;
     silenceStillPressed = false;
   }
-  if (digitalRead(34) == HIGH){ //DRILL BUTTON
+  if (digitalRead(drillSwitchPin) == HIGH){ //DRILL BUTTON
     drillPressed = true;
   } else {
     drillPressed = false;
@@ -908,7 +924,7 @@ void config(){
         }
       }
     } else if (drillPressed == true and drillStillPressed == false){
-      currentConfigTop = "bruh";
+      currentConfigTop = "e"; //make sure the screen re-renders
       if (cursorPosition != 15){
         cursorPosition++;
       } else {
@@ -1038,13 +1054,13 @@ void config(){
   
 
 
-  if (digitalRead(32) == HIGH){ //RESET BUTTON
+  if (digitalRead(resetSwitchPin) == HIGH){ //RESET BUTTON
     resetStillPressed = true;
   }
-  if (digitalRead(35) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceSwitchPin) == HIGH){ //SILENCE BUTTON
     silenceStillPressed = true;
   }
-  if (digitalRead(34) == HIGH){ //DRILL BUTTON
+  if (digitalRead(drillSwitchPin) == HIGH){ //DRILL BUTTON
     drillStillPressed = true;
   }
 }

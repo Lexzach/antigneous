@@ -37,7 +37,6 @@
 - - - panel name
 - - - [stats for nerds]
 - - - - zone input voltages
-- - - - 
 - - [lcd timeout]
 - - - 30 sec, 1 min, 5 min, 30 min, off
 [advanced settings]

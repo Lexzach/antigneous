@@ -4,7 +4,9 @@ Address allocation:
 8 | 0-1 - is a key required
 9 | 0-1 - is there verification
 10 | 1-255 - how long to do verification (value * 0.1 = actual verification time in seconds)
-11-71 | 65-90, 45-57, 32, 39 - System name
+11-26 | 65-90, 45-57, 32, 39 - System name
+50 | 1-255 - EEPROM version
+51 | 1-255 - EEPROM build
 72 | 0-4094 - EOL resistor lenience
 73 | 0-1 - enable EOL resistor
 74 | 0-1 - pre-alarm enabled
