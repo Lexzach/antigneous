@@ -1,0 +1,47 @@
+[testing]
+- walk test
+- silent walk test
+- strobe test
+- automatic system test
+[settings]
+- [fire alarm settings]
+- - [coding]
+- - - Temporal 3 = 0
+- - - Marchtime = 1
+- - - 4-4 = 2
+- - - Continuious = 3
+- - - California = 4
+- - - Marchtime (slower) = 5
+- - enable/disable verification
+- - [verification time]
+- - - 0.1-25.5 seconds
+- - [pre-alarm]
+- - - enable/disable pre-alarm
+- - - [first-stage]
+- - - - [first-stage time]
+- - - - - 1-10 minutes
+- - - [second-stage]
+- - - [smoke detector pre-alarm]
+- - - - enable/disable smoke detector pre-alarm
+- - - - [smoke detector timeout]
+- - - - - 1-20 minutes
+- - enable/disable audible silence
+- [panel settings]
+- - [panel name]
+- - - enter panel name
+- - [panel security]
+- - - None
+- - - Keyswitch (pin 33)
+- - - Passcode (future)
+- - [homescreen]
+- - - panel name
+- - - [stats for nerds]
+- - - - zone input voltages
+- - - - 
+- - [lcd timeout]
+- - - 30 sec, 1 min, 5 min, 30 min, off
+[advanced settings]
+- [resistor lenience]
+- - 0-200
+- enable/disable EOL resistors
+
