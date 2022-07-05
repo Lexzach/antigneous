@@ -114,7 +114,7 @@ void resetEEPROM() {
     EEPROM.write(77,5); //smoke detector timeout is five minutes by default
     EEPROM.write(78,0); //homescreen is panel name by default
     EEPROM.write(79,1); //audible silence is enabled by default
-    EEPROM.write(80,0); //lcd timeout is disabled by default
+    EEPROM.write(80,0); //lcd timeout is disabled by default (time in MS found by taking value and multiplying it by 15000)
 
 
     EEPROM.commit();
