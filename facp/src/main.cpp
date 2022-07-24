@@ -72,7 +72,7 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 
 //PINS
 int zone1Pin = 15;
-int zone2Pin = 15; //TESTING is set to 15 but is normally 39
+int zone2Pin = 15; //TESTING is set to 15 but is normally 39.
 int hornPin = 13;
 int buzzerPin = 4;
 int strobePin = 18;
