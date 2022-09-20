@@ -8,7 +8,7 @@ int EEPROMVersion = 1; //version control to rewrite eeprom after update
 int EEPROMBuild = 1;
 
 
-//RUNTIME VARIABLES
+//----------------------------------------------------------------------------- RUNTIME VARIABLES
 bool fullAlarm = false; //bool to control if this is a full alarm that requres a panel reset to clear
 bool silenced = false;
 bool keyInserted = false; //if the control panel has a key inserted
@@ -53,7 +53,7 @@ String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
 String currentConfigBottom;
 
-//CONFIG VARIABLES (Set these by default in case eeprom fails to load, and it cannot be reset. Allows the FACP to still run with a default configuration)
+//Default EEPROM values in the case that the EEPROM fails to load
 bool keyRequired = false; //determine if key switch is required to operate buttons
 bool isVerification = true; //is verification turned on
 bool eolResistor = true; //is the EOL resistor enabled
@@ -81,50 +81,76 @@ int readyLedPin = 27;
 int silenceLedPin = 26;
 int alarmLedPin = 25;
 int keySwitchPin = 33;
-int resetSwitchPin = 32;
-int silenceSwitchPin = 35;
-int drillSwitchPin = 34;
+int resetButtonPin = 32;
+int silenceButtonPin = 35;
+int drillButtonPin = 34;
 int sclPin = 22;
 int sdaPin = 21;
+//----------------------------------------------------------------------------- RUNTIME VARIABLES
 
+
+//----------------------------------------------------------------------------- EEPROM RESET
 void resetEEPROM() {
   for (int i=0; i<=1024; i++){ //write all 255's from 0-1024 address
       EEPROM.write(i,255);
-    }
+  }
+  Serial.println("Erased EEPROM");
 
-    EEPROM.write(0,76);EEPROM.write(1,101);EEPROM.write(2,120);EEPROM.write(3,122);EEPROM.write(4,97);EEPROM.write(5,99);EEPROM.write(6,104); //write Lexzach to addresses 0-6
-    EEPROM.write(7,0); //code-3 default
-    EEPROM.write(8,0); //key not required by default
-    EEPROM.write(9,1); //verification is turned on by default
-    EEPROM.write(10,25); //default verification time of 2.5 seconds
+  EEPROM.write(0,76);EEPROM.write(1,101);EEPROM.write(2,120);EEPROM.write(3,122);EEPROM.write(4,97);EEPROM.write(5,99);EEPROM.write(6,104); //write Lexzach to addresses 0-6
+  Serial.println("Wrote LEXZACH header");
+  EEPROM.write(7,0); //code-3 default
+  Serial.println("Configured Code-3");
+  EEPROM.write(8,0); //key not required by default
+  Serial.println("Disabled key");
+  EEPROM.write(9,1); //verification is turned on by default
+  Serial.println("Turned on verification");
+  EEPROM.write(10,25); //default verification time of 2.5 seconds
+  Serial.println("Set verification time of 2.5 seconds");
 
-    //system name "ANTIGNEOUS"
-    EEPROM.write(11,65);EEPROM.write(12,78);EEPROM.write(13,84);EEPROM.write(14,73);EEPROM.write(15,71);EEPROM.write(16,78);EEPROM.write(17,69);EEPROM.write(18,79);EEPROM.write(19,85);EEPROM.write(20,83);
-    for (int i=21; i<=26; i++){ //write all 0's from 23-71 address
-      EEPROM.write(i,0);
-    }
+  //system name "ANTIGNEOUS"
+  EEPROM.write(11,65);EEPROM.write(12,78);EEPROM.write(13,84);EEPROM.write(14,73);EEPROM.write(15,71);EEPROM.write(16,78);EEPROM.write(17,69);EEPROM.write(18,79);EEPROM.write(19,85);EEPROM.write(20,83);
+  Serial.println("Wrote system name 'ANTIGNEOUS'");
+  for (int i=21; i<=26; i++){ //write all 0's from 21-26 address
+    EEPROM.write(i,32);
+  }
+  Serial.println("Wrote 6 blank spaces");
 
-    EEPROM.write(50, EEPROMVersion); //write current version and build
-    EEPROM.write(51, EEPROMBuild); 
-    EEPROM.write(72,125); //EOL lenience 500 by default (take the value stored and multiply by 4 to get actual value)
-    EEPROM.write(73,1); //EOL resistor is enabled by default
-    EEPROM.write(74,0); //pre-alarm disabled by default
-    EEPROM.write(75,1); //pre-alarm first-stage is 1 minute by default
-    EEPROM.write(76,0); //smoke detector pre-alarm is disable by default
-    EEPROM.write(77,5); //smoke detector timeout is five minutes by default
-    EEPROM.write(78,0); //homescreen is panel name by default
-    EEPROM.write(79,1); //audible silence is enabled by default
-    EEPROM.write(80,0); //lcd timeout is disabled by default (time in MS found by taking value and multiplying it by 15000)
+  EEPROM.write(50, EEPROMVersion); //write current version and build
+  EEPROM.write(51, EEPROMBuild); 
+  Serial.println("Wrote EEPROM version and build");
+  EEPROM.write(72,125); //EOL lenience 500 by default (take the value stored and multiply by 4 to get actual value)
+  Serial.println("Set EOL lenience to 500");
+  EEPROM.write(73,1); //EOL resistor is enabled by default
+  Serial.println("Enabled EOL resistor");
+  EEPROM.write(74,0); //pre-alarm disabled by default
+  Serial.println("Disabled pre-alarm");
+  EEPROM.write(75,1); //pre-alarm first-stage is 1 minute by default
+  Serial.println("Set pre-alarm first stage to 1 minute");
+  EEPROM.write(76,0); //smoke detector pre-alarm is disable by default
+  Serial.println("Disabled smoke detector pre-alarm");
+  EEPROM.write(77,5); //smoke detector timeout is five minutes by default
+  Serial.println("Set smoke detector timeout to 5 minutes");
+  EEPROM.write(78,0); //homescreen is panel name by default
+  Serial.println("Set panel name as homescreen");
+  EEPROM.write(79,1); //audible silence is enabled by default
+  Serial.println("Enabled audible silence");
+  EEPROM.write(80,0); //lcd timeout is disabled by default (time in MS found by taking value and multiplying it by 15000)
+  Serial.println("Disabled LCD timeout");
 
 
-    EEPROM.commit();
+  EEPROM.commit();
+  Serial.println("Wrote changes to EEPROM");
 }
+//----------------------------------------------------------------------------- EEPROM RESET
 
 void setup() {
+  EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
+  Serial.println("Configured EEPROM for addresses 0-1024");
   Serial.begin(115200); //begin serial
   Serial.println("Lexzach's Low-Cost FACP v1");
   Serial.println("Booting...");
 
+//----------------------------------------------------------------------------- SETUP PINS
   pinMode(hornPin, OUTPUT); //horn
   pinMode(strobePin, OUTPUT); //strobe
   pinMode(smokeDetectorPin, OUTPUT); //smoke relay
@@ -132,9 +158,9 @@ void setup() {
   pinMode(silenceLedPin, OUTPUT); //silence LED
   pinMode(alarmLedPin, OUTPUT); //alarm LED
   pinMode(keySwitchPin, INPUT); //key switch
-  pinMode(resetSwitchPin, INPUT); //reset switch
-  pinMode(silenceSwitchPin, INPUT); //silence switch
-  pinMode(resetSwitchPin, INPUT); //drill switch
+  pinMode(resetButtonPin, INPUT); //reset switch
+  pinMode(silenceButtonPin, INPUT); //silence switch
+  pinMode(drillButtonPin, INPUT); //drill switch
   
   pinMode(zone1Pin, INPUT); //zone 1
   pinMode(zone2Pin, INPUT); //zone 2
@@ -146,33 +172,78 @@ void setup() {
   
   pinMode(sclPin, OUTPUT); //scl
   pinMode(sdaPin, OUTPUT); //sda
+//----------------------------------------------------------------------------- SETUP PINS
 
   Serial.println("Initializing LCD...");
   lcd.init(); //initialize LCD
   lcd.backlight();
+
+//----------------------------------------------------------------------------- EEPROM RESET BUTTONS
+  if (digitalRead(resetButtonPin)==HIGH and digitalRead(silenceButtonPin)==HIGH and digitalRead(drillButtonPin)==HIGH){ //reset EEPROM if all buttons are pressed
+    for(int i=5; i!=0; i--){
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("TO RESET EEPROM");
+      lcd.setCursor(0,1);
+      lcd.print((String)"HOLD BUTTONS - "+i);
+      delay(1000);
+    }
+    if (digitalRead(resetButtonPin)==HIGH and digitalRead(silenceButtonPin)==HIGH and digitalRead(drillButtonPin)==HIGH){
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("RESETTING TO");
+      lcd.setCursor(0,1);
+      lcd.print("FACTORY SETTINGS");
+      resetEEPROM();
+      delay(4000);
+      ESP.restart();
+    } else {
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("EEPROM RESET");
+      lcd.setCursor(0,1);
+      lcd.print("CANCELLED");
+      delay(3000);
+    }
+  }
+//----------------------------------------------------------------------------- EEPROM RESET BUTTONS
+
   lcd.clear();
   lcd.setCursor(4,0);
   lcd.print("Booting...");
 
+
   Serial.println("Configured all pins");
-  
 
-  EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
-  Serial.println("Configured EEPROM for addresses 0-1024");
-
-  // EEPROM.write(0,255); //UNCOMMENT TO INVALIDATE EEPROM AND REFLASH IT AFTER EVERY RESTART
-  // EEPROM.commit();
+  //EEPROM.write(0,255); //-------------------------------------------------------UNCOMMENT TO INVALIDATE EEPROM AND REFLASH IT AFTER EVERY RESTART
+  //EEPROM.commit();
 
   Serial.println("Verifying EEPROM configuration integrity...");
 
-  if (EEPROM.read(0) != 76 or EEPROM.read(6) != 104 or EEPROM.read(7) > 5 or EEPROM.read(8) > 1 or EEPROM.read(50) != EEPROMVersion or EEPROM.read(51) != EEPROMBuild){ //EEPROM verification, check essential-to-run components, listing all conditions that cannot exist in a correct EEPROM
-    Serial.println("EEPROM verification failed. Re-writing EEPROM");
-    resetEEPROM();
+//----------------------------------------------------------------------------- EEPROM INTEGRETY  
+  if (EEPROM.read(0) != 76 or EEPROM.read(6) != 104 or EEPROM.read(7) > 5 or EEPROM.read(8) > 1 or EEPROM.read(50) != EEPROMVersion or EEPROM.read(51) != EEPROMBuild){
+    Serial.println("EEPROM verification failed.");
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("ERROR 1");
+    lcd.setCursor(0,1); 
+    lcd.print("check manual");
+    while(digitalRead(resetButtonPin) == LOW and digitalRead(drillButtonPin) == LOW){ //wait until button is pressed
+      delay(1);
+    }
+    if(digitalRead(resetButtonPin) == HIGH){
+      Serial.println("Resetting...");
+      ESP.restart();
+    } else if (digitalRead(drillButtonPin) == HIGH){
+      resetEEPROM();
+    }
   } else {
     Serial.println("EEPROM verification finished");
   }
-  
-  Serial.println("Current EEPROM:");
+//----------------------------------------------------------------------------- EEPROM INTEGRETY  
+
+
+  Serial.println("Current EEPROM dump:"); //dump EEPROM into serial monitor
   for (int i=0; i<=1024; i++){
     Serial.print(EEPROM.read(i));
     Serial.print(" ");
@@ -219,7 +290,7 @@ void setup() {
   panelHomescreen = EEPROM.read(78);
   lcdTimeout = EEPROM.read(80)*15000;
   int x=0;
-  for (int i=11; i<=71; i++){ //read panel name
+  for (int i=11; i<=26; i++){ //read panel name
     if (EEPROM.read(i) != 0){
       panelName = panelName + (char)EEPROM.read(i);
       panelNameList[x] = EEPROM.read(i);
@@ -265,6 +336,7 @@ void checkKey(){
   }
 }
 
+//----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES
 void checkDevices(){
   
   if (walkTest == 0){
@@ -330,6 +402,8 @@ void checkDevices(){
     troubleTimer = 0;
   }
 }
+//----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES
+
 
 void troubleCheck(){
   if (trouble == true){
@@ -359,9 +433,8 @@ void troubleCheck(){
   }
 }
 
-void checkButtons(){
-  if (digitalRead(resetSwitchPin) == HIGH){ //RESET BUTTON
-    lcd.clear();
+void reboot(){
+  lcd.clear();
     lcd.setCursor(2,0);
     lcd.print("Resetting...");
     tone();
@@ -374,12 +447,17 @@ void checkButtons(){
     delay(2500);
     noTone();
     digitalWrite(readyLedPin, LOW); //ready LED
-    digitalWrite(silenceLedPin, HIGH); //silence LED
-    digitalWrite(alarmLedPin, HIGH); //alarm LED  
+    digitalWrite(silenceLedPin, LOW); //silence LED
+    digitalWrite(alarmLedPin, LOW); //alarm LED  
     ESP.restart();
+}
+
+void checkButtons(){
+  if (digitalRead(resetButtonPin) == HIGH){ //RESET BUTTON
+    reboot();
   }
 
-  if (digitalRead(silenceSwitchPin) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceButtonPin) == HIGH){ //SILENCE BUTTON
     if (horn == true){ //if horns are not silenced, silence the horns
       digitalWrite(silenceLedPin, HIGH);
       digitalWrite(alarmLedPin, HIGH);
@@ -410,8 +488,8 @@ void checkButtons(){
     silencePressed = false;
   }
 
-  if (digitalRead(drillSwitchPin) == HIGH and horn != true){ //DRILL BUTTON
-    if (drill == 2000){
+  if (digitalRead(drillButtonPin) == HIGH and horn != true){ //DRILL BUTTON
+    if (drill >= 2000){
       activateNAC();
     } else {
       drill++;
@@ -609,29 +687,29 @@ void config(){
   char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
-  char *mainPanelSettingsFactoryReset[] = {"Are you sure?"}; //menu 11
   char *mainPanelSettingsAbout[] = {"ANTIGNEOUS OS","Firmware:",firmwareRev,"by Lexzach"}; //menu 12
   
   // char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
   // char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"}; //menu 11
-  if (digitalRead(resetSwitchPin) == HIGH){ //RESET BUTTON
+  if (digitalRead(resetButtonPin) == HIGH){ //RESET BUTTON
     resetPressed = true;
   } else {
     resetPressed = false;
     resetStillPressed = false;
   }
-  if (digitalRead(silenceSwitchPin) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceButtonPin) == HIGH){ //SILENCE BUTTON
     silencePressed = true;
   } else {
     silencePressed = false;
     silenceStillPressed = false;
   }
-  if (digitalRead(drillSwitchPin) == HIGH){ //DRILL BUTTON
+  if (digitalRead(drillButtonPin) == HIGH){ //DRILL BUTTON
     drillPressed = true;
   } else {
     drillPressed = false;
     drillStillPressed = false;
   }
+//----------------------------------------------------------------------------- MAIN MENU
   if (configPage == 0){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){ //main screen
@@ -660,6 +738,9 @@ void config(){
         configBottom = (String)mainSettings[1];
       }
     }
+//----------------------------------------------------------------------------- MAIN MENU
+
+//----------------------------------------------------------------------------- TESTING
   } else if (configPage == 1){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){
@@ -706,6 +787,9 @@ void config(){
           }
         }
     }
+//----------------------------------------------------------------------------- TESTING
+
+//----------------------------------------------------------------------------- SETTINGS
   } else if (configPage == 2){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){ //main screen
@@ -735,6 +819,9 @@ void config(){
         configBottom = (String)mainPanelSettings[1];
       }
     }
+//----------------------------------------------------------------------------- SETTINGS
+
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM
   } else if (configPage == 3){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){
@@ -797,6 +884,9 @@ void config(){
         configBottom = (String)mainSettingsFireAlarmSettings[0];
       }
     }
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM
+
+//----------------------------------------------------------------------------- SETTINGS > PANEL
   } else if (configPage == 8){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){
@@ -877,11 +967,16 @@ void config(){
           configTop = (String)mainPanelSettings[2] + lcdTimeout/60000+"m";
         }
       } else if (cursorPosition == 3){
-        //factory reset
+        configBottom = "drill = yes";
+        configTop = "silence = no";
+        configPage = 5;
       } else if (cursorPosition == 4){
         //firmware version
       }
     }
+//----------------------------------------------------------------------------- SETTINGS > PANEL
+
+//----------------------------------------------------------------------------- SETTINGS > PANEL > PANEL NAME
   } else if (configPage == 10){ //panel rename routine 
     
     if (resetPressed == true and resetStillPressed == false){
@@ -916,7 +1011,7 @@ void config(){
       configBottom = (String)mainPanelSettings[1];
       x=0;
       panelName = "";
-      for (int i=11; i<=71; i++){ //read panel name
+      for (int i=11; i<=26; i++){ //read panel name
         if (EEPROM.read(i) != 0){
           panelName = panelName + (char)EEPROM.read(i);
           panelNameList[x] = EEPROM.read(i);
@@ -937,6 +1032,31 @@ void config(){
         configBottom = configBottom + (char)panelNameList[i];
       }
     }
+//----------------------------------------------------------------------------- SETTINGS > PANEL > PANEL NAME
+
+//----------------------------------------------------------------------------- SETTINGS > PANEL > FACTORY RESET
+  } else if (configPage == 5){
+    configBottom = "drill = yes";
+    configTop = "silence = no";
+    if (silencePressed == true and silenceStillPressed == false){
+      configPage = 8;
+      cursorPosition = 0;
+      configTop = (String)mainPanelSettings[0];
+      configBottom = (String)mainPanelSettings[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      digitalWrite(readyLedPin, LOW); //ready LED
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("RESETTING TO");
+      lcd.setCursor(0,1);
+      lcd.print("FACTORY SETTINGS");
+      resetEEPROM();
+      delay(4000);
+      ESP.restart();
+    }
+//----------------------------------------------------------------------------- SETTINGS > PANEL > FACTORY RESET
+
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > CODING
   } else if (configPage == 5){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){
@@ -1028,7 +1148,10 @@ void config(){
       }
       codeWheel = EEPROM.read(7); //codeWheel setting address
     }
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > CODING
+
   }
+
   
   // if (resetPressed == true and resetStillPressed == false){
 
@@ -1054,13 +1177,13 @@ void config(){
   
 
 
-  if (digitalRead(resetSwitchPin) == HIGH){ //RESET BUTTON
+  if (digitalRead(resetButtonPin) == HIGH){ //RESET BUTTON
     resetStillPressed = true;
   }
-  if (digitalRead(silenceSwitchPin) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceButtonPin) == HIGH){ //SILENCE BUTTON
     silenceStillPressed = true;
   }
-  if (digitalRead(drillSwitchPin) == HIGH){ //DRILL BUTTON
+  if (digitalRead(drillButtonPin) == HIGH){ //DRILL BUTTON
     drillStillPressed = true;
   }
 }
@@ -1072,9 +1195,11 @@ void loop() {
     } else if (backlightOn == true) {
       lcdTimeoutTimer++;
     }
-    if ((drillPressed == true or silencePressed == true or resetPressed == true or fullAlarm == true or trouble == true) and backlightOn == false){
+    if (drillPressed == true or silencePressed == true or resetPressed == true or fullAlarm == true or trouble == true){
       lcdTimeoutTimer = 0;
-      lcd.backlight();
+      if (backlightOn == false){
+        lcd.backlight();
+      }
       backlightOn = true;
     }
   }
