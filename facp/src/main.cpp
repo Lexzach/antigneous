@@ -183,7 +183,7 @@ void setup() {
     for(int i=5; i!=0; i--){
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("TO RESET EEPROM");
+      lcd.print("TO FACTORY RESET");
       lcd.setCursor(0,1);
       lcd.print((String)"HOLD BUTTONS - "+i);
       delay(1000);
@@ -200,7 +200,7 @@ void setup() {
     } else {
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("EEPROM RESET");
+      lcd.print("FACTORY RESET");
       lcd.setCursor(0,1);
       lcd.print("CANCELLED");
       delay(3000);
@@ -210,8 +210,10 @@ void setup() {
 
   lcd.clear();
   lcd.setCursor(4,0);
-  lcd.print("Booting...");
-
+  lcd.print("BOOTING...");
+  lcd.setCursor(0,1);
+  lcd.print("I/O");
+  delay(100);
 
   Serial.println("Configured all pins");
 
@@ -238,10 +240,15 @@ void setup() {
       resetEEPROM();
     }
   } else {
-    Serial.println("EEPROM verification finished");
+    Serial.println("EEPROM integrity verified");
   }
 //----------------------------------------------------------------------------- EEPROM INTEGRETY  
-
+  lcd.clear();
+  lcd.setCursor(4,0);
+  lcd.print("BOOTING...");
+  lcd.setCursor(0,1);
+  lcd.print("I/O-SLFTST");
+  delay(100);
 
   Serial.println("Current EEPROM dump:"); //dump EEPROM into serial monitor
   for (int i=0; i<=1024; i++){
@@ -297,11 +304,18 @@ void setup() {
       x++;
     }
   }
+  lcd.clear();
+  lcd.setCursor(4,0);
+  lcd.print("BOOTING...");
+  lcd.setCursor(0,1);
+  lcd.print("I/O-SLFTST-CONFIG");
+  delay(100);
   Serial.println("Config loaded");
   digitalWrite(readyLedPin, HIGH); //power on ready LED on startup
   digitalWrite(silenceLedPin, LOW);
   digitalWrite(alarmLedPin, LOW);
   digitalWrite(smokeDetectorPin, LOW); //turn on smoke relay
+  Serial.println("-=- STARTUP COMPLETE -=-");
 }
 
 
@@ -325,7 +339,7 @@ void activateNAC(){
   configMenu = false;
   tone();
   digitalWrite(alarmLedPin, HIGH);
-  digitalWrite(silenceLedPin, HIGH);
+  digitalWrite(silenceLedPin, LOW);
 }
 
 void checkKey(){
@@ -383,7 +397,7 @@ void checkDevices(){
       if (silentWalkTest == false){
         digitalWrite(hornPin, HIGH);
       }
-      digitalWrite(alarmLedPin, HIGH);
+      digitalWrite(alarmLedPin, LOW);
       currentScreen = -1;
       delay(250);
       digitalWrite(smokeDetectorPin, LOW);
@@ -444,6 +458,7 @@ void reboot(){
     digitalWrite(hornPin, HIGH); //horn
     digitalWrite(strobePin, HIGH); //strobe
     digitalWrite(smokeDetectorPin, HIGH); //smoke relay
+    lcd.backlight();
     delay(2500);
     noTone();
     digitalWrite(readyLedPin, LOW); //ready LED
@@ -460,7 +475,7 @@ void checkButtons(){
   if (digitalRead(silenceButtonPin) == HIGH){ //SILENCE BUTTON
     if (horn == true){ //if horns are not silenced, silence the horns
       digitalWrite(silenceLedPin, HIGH);
-      digitalWrite(alarmLedPin, HIGH);
+      digitalWrite(alarmLedPin, LOW);
       horn = false;
       if (audibleSilence == false){
         strobe = false;
@@ -501,6 +516,7 @@ void checkButtons(){
   }
 }
 
+//----------------------------------------------------------------------------- NAC ACTIVATION
 void alarm(){
   if (strobe == true){
     digitalWrite(strobePin, LOW);
@@ -605,7 +621,7 @@ void alarm(){
         digitalWrite(alarmLedPin, HIGH);
         alarmLedTimer = 0;
       } else {
-        digitalWrite(alarmLedPin, HIGH);
+        digitalWrite(alarmLedPin, LOW);
         alarmLedTimer = 0;
       }
     }
@@ -614,6 +630,7 @@ void alarm(){
     codeWheelTimer = 0;
   }
 }
+//----------------------------------------------------------------------------- NAC ACTIVATION
 
 void lcdUpdate(){
   if (trouble==false and fullAlarm==false and horn==false and strobe==false and walkTest == false and currentScreen != 0){
@@ -680,7 +697,7 @@ void config(){
   char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
   char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.: "}; //menu 3
-  char *mainSettingsVerificationSettings[] = {"Verification:","Verif. Time"}; //menu 4
+  char *mainSettingsVerificationSettings[] = {"Verification: ","Verif. Time"}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","stage 1: ","Detector PreAlrm"}; //menu 6
   char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Tmeout: "}; //menu 7
@@ -864,7 +881,7 @@ void config(){
       } else if (cursorPosition == 1) {
         configPage = 4;
         cursorPosition = 0;
-        configTop = (String)mainSettingsVerificationSettings[0];
+        configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
         configBottom = (String)mainSettingsVerificationSettings[1];
       } else if (cursorPosition == 2) {
         configPage = 6;
@@ -969,7 +986,7 @@ void config(){
       } else if (cursorPosition == 3){
         configBottom = "drill = yes";
         configTop = "silence = no";
-        configPage = 5;
+        configPage = -1;
       } else if (cursorPosition == 4){
         //firmware version
       }
@@ -1035,7 +1052,7 @@ void config(){
 //----------------------------------------------------------------------------- SETTINGS > PANEL > PANEL NAME
 
 //----------------------------------------------------------------------------- SETTINGS > PANEL > FACTORY RESET
-  } else if (configPage == 5){
+  } else if (configPage == -1){
     configBottom = "drill = yes";
     configTop = "silence = no";
     if (silencePressed == true and silenceStillPressed == false){
@@ -1150,7 +1167,40 @@ void config(){
     }
 //----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > CODING
 
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > VERIFICATION
+  } else if (configPage == 4){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){
+        cursorPosition = 1;
+        configTop = (String)mainSettingsVerificationSettings[1];
+        configBottom = (String)mainSettingsVerificationSettings[0]+isVerification;
+      } else if (cursorPosition == 1) {
+        cursorPosition = 0;
+        configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
+        configBottom = (String)mainSettingsVerificationSettings[1];
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 3;
+      cursorPosition = 0;
+      configTop = (String)mainSettingsFireAlarmSettings[0];
+      configBottom = (String)mainSettingsFireAlarmSettings[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      if (cursorPosition == 0){
+        if (isVerification == true){
+          isVerification = false;
+          EEPROM.write(9,0);
+        } else {
+          isVerification = true;
+          EEPROM.write(9,1);
+        }
+        EEPROM.commit();
+        configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
+        configBottom = (String)mainSettingsVerificationSettings[1];
+      } else if (cursorPosition == 1) {
+        //computer do shit
+      }
   }
+}
 
   
   // if (resetPressed == true and resetStillPressed == false){
