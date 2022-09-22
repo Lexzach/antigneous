@@ -73,13 +73,13 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 //PINS
 int zone1Pin = 15;
 int zone2Pin = 15; //TESTING is set to 15 but is normally 39.
-int hornPin = 13;
+int hornRelay = 13;
 int buzzerPin = 4;
-int strobePin = 18;
-int smokeDetectorPin = 14;
-int readyLedPin = 27;
-int silenceLedPin = 26;
-int alarmLedPin = 25;
+int strobeRelay = 18;
+int smokeDetectorRelay = 14;
+int readyLed = 27;
+int silenceLed = 26;
+int alarmLed = 25;
 int keySwitchPin = 33;
 int resetButtonPin = 32;
 int silenceButtonPin = 35;
@@ -87,6 +87,24 @@ int drillButtonPin = 34;
 int sclPin = 22;
 int sdaPin = 21;
 //----------------------------------------------------------------------------- RUNTIME VARIABLES
+
+
+
+
+
+
+
+
+
+
+
+//get resistor lenience by having zone 1, zone 2, and smoke on a output pin instead of +3.3v so you can measure the difference
+
+
+
+
+
+
 
 
 //----------------------------------------------------------------------------- EEPROM RESET
@@ -151,12 +169,12 @@ void setup() {
   Serial.println("Booting...");
 
 //----------------------------------------------------------------------------- SETUP PINS
-  pinMode(hornPin, OUTPUT); //horn
-  pinMode(strobePin, OUTPUT); //strobe
-  pinMode(smokeDetectorPin, OUTPUT); //smoke relay
-  pinMode(readyLedPin, OUTPUT); //ready LED
-  pinMode(silenceLedPin, OUTPUT); //silence LED
-  pinMode(alarmLedPin, OUTPUT); //alarm LED
+  pinMode(hornRelay, OUTPUT); //horn
+  pinMode(strobeRelay, OUTPUT); //strobe
+  pinMode(smokeDetectorRelay, OUTPUT); //smoke relay
+  pinMode(readyLed, OUTPUT); //ready LED
+  pinMode(silenceLed, OUTPUT); //silence LED
+  pinMode(alarmLed, OUTPUT); //alarm LED
   pinMode(keySwitchPin, INPUT); //key switch
   pinMode(resetButtonPin, INPUT); //reset switch
   pinMode(silenceButtonPin, INPUT); //silence switch
@@ -166,9 +184,9 @@ void setup() {
   pinMode(zone2Pin, INPUT); //zone 2
 
   pinMode(buzzerPin, OUTPUT); //buzzer
-  digitalWrite(hornPin, HIGH); //horn
-  digitalWrite(strobePin, HIGH); //strobe
-  digitalWrite(smokeDetectorPin, HIGH); //smoke relay
+  digitalWrite(hornRelay, HIGH); //horn
+  digitalWrite(strobeRelay, HIGH); //strobe
+  digitalWrite(smokeDetectorRelay, HIGH); //smoke relay
   
   pinMode(sclPin, OUTPUT); //scl
   pinMode(sdaPin, OUTPUT); //sda
@@ -311,10 +329,10 @@ void setup() {
   lcd.print("I/O-SLFTST-CONFIG");
   delay(100);
   Serial.println("Config loaded");
-  digitalWrite(readyLedPin, HIGH); //power on ready LED on startup
-  digitalWrite(silenceLedPin, LOW);
-  digitalWrite(alarmLedPin, LOW);
-  digitalWrite(smokeDetectorPin, LOW); //turn on smoke relay
+  digitalWrite(readyLed, HIGH); //power on ready LED on startup
+  digitalWrite(silenceLed, LOW);
+  digitalWrite(alarmLed, LOW);
+  digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
   Serial.println("-=- STARTUP COMPLETE -=-");
 }
 
@@ -338,8 +356,8 @@ void activateNAC(){
   silenced = false;
   configMenu = false;
   tone();
-  digitalWrite(alarmLedPin, HIGH);
-  digitalWrite(silenceLedPin, LOW);
+  digitalWrite(alarmLed, HIGH);
+  digitalWrite(silenceLed, LOW);
 }
 
 void checkKey(){
@@ -382,25 +400,25 @@ void checkDevices(){
       walkTestCount++;
       walkTestSmokeDetectorTimer = 0;
       while (analogRead(zone1Pin) <= resistorLenience) {// or analogRead(zone2Pin) <= resistorLenience) {
-        digitalWrite(strobePin, LOW);
+        digitalWrite(strobeRelay, LOW);
         if (silentWalkTest == false){
-          digitalWrite(hornPin, LOW);
+          digitalWrite(hornRelay, LOW);
         }
-        digitalWrite(alarmLedPin, HIGH);
+        digitalWrite(alarmLed, HIGH);
         walkTestSmokeDetectorTimer++;
         if (walkTestSmokeDetectorTimer >= 5000){
-          digitalWrite(smokeDetectorPin, HIGH);
+          digitalWrite(smokeDetectorRelay, HIGH);
         }
         delay(1);
       }
-      digitalWrite(strobePin, HIGH);
+      digitalWrite(strobeRelay, HIGH);
       if (silentWalkTest == false){
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       }
-      digitalWrite(alarmLedPin, LOW);
+      digitalWrite(alarmLed, LOW);
       currentScreen = -1;
       delay(250);
-      digitalWrite(smokeDetectorPin, LOW);
+      digitalWrite(smokeDetectorRelay, LOW);
     }
   }
 
@@ -422,12 +440,12 @@ void checkDevices(){
 void troubleCheck(){
   if (trouble == true){
     if (troubleLedTimer == 0){
-      digitalWrite(readyLedPin, LOW);
+      digitalWrite(readyLed, LOW);
       if (troubleAck == false and fullAlarm == false){
         noTone();
       }
     } else if (troubleLedTimer == 750){
-      digitalWrite(readyLedPin, HIGH);
+      digitalWrite(readyLed, HIGH);
       if (troubleAck == false and fullAlarm == false){ //sound the buzzer if the trouble is not acked
         tone();
       }
@@ -438,7 +456,7 @@ void troubleCheck(){
     troubleLedTimer++;
   } else {
     if (walkTest == false){
-      digitalWrite(readyLedPin, HIGH);
+      digitalWrite(readyLed, HIGH);
     }
     if (troubleLedTimer != 0){
       noTone();
@@ -452,18 +470,18 @@ void reboot(){
     lcd.setCursor(2,0);
     lcd.print("Resetting...");
     tone();
-    digitalWrite(readyLedPin, HIGH); //ready LED
-    digitalWrite(silenceLedPin, HIGH); //silence LED
-    digitalWrite(alarmLedPin, HIGH); //alarm LED
-    digitalWrite(hornPin, HIGH); //horn
-    digitalWrite(strobePin, HIGH); //strobe
-    digitalWrite(smokeDetectorPin, HIGH); //smoke relay
+    digitalWrite(readyLed, HIGH); //ready LED
+    digitalWrite(silenceLed, HIGH); //silence LED
+    digitalWrite(alarmLed, HIGH); //alarm LED
+    digitalWrite(hornRelay, HIGH); //horn
+    digitalWrite(strobeRelay, HIGH); //strobe
+    digitalWrite(smokeDetectorRelay, HIGH); //smoke relay
     lcd.backlight();
     delay(2500);
     noTone();
-    digitalWrite(readyLedPin, LOW); //ready LED
-    digitalWrite(silenceLedPin, LOW); //silence LED
-    digitalWrite(alarmLedPin, LOW); //alarm LED  
+    digitalWrite(readyLed, LOW); //ready LED
+    digitalWrite(silenceLed, LOW); //silence LED
+    digitalWrite(alarmLed, LOW); //alarm LED  
     ESP.restart();
 }
 
@@ -474,8 +492,8 @@ void checkButtons(){
 
   if (digitalRead(silenceButtonPin) == HIGH){ //SILENCE BUTTON
     if (horn == true){ //if horns are not silenced, silence the horns
-      digitalWrite(silenceLedPin, HIGH);
-      digitalWrite(alarmLedPin, LOW);
+      digitalWrite(silenceLed, HIGH);
+      digitalWrite(alarmLed, LOW);
       horn = false;
       if (audibleSilence == false){
         strobe = false;
@@ -519,25 +537,25 @@ void checkButtons(){
 //----------------------------------------------------------------------------- NAC ACTIVATION
 void alarm(){
   if (strobe == true){
-    digitalWrite(strobePin, LOW);
+    digitalWrite(strobeRelay, LOW);
   }else{
-    digitalWrite(strobePin,HIGH);
+    digitalWrite(strobeRelay,HIGH);
   }
   if (horn == true){
     if (codeWheel == 0){
 
       if (codeWheelTimer == 0){ //temporal code 3 
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 500) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 1000) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 1500) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 2000) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 2500) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 4000) {
         codeWheelTimer = -1;
       }
@@ -546,9 +564,9 @@ void alarm(){
     } else if (codeWheel == 1) {
 
       if (codeWheelTimer == 0){ //marchtime
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 250){
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 500){
         codeWheelTimer = -1;
       }
@@ -556,58 +574,58 @@ void alarm(){
     } else if (codeWheel == 2) { //4-4
       
       if (codeWheelTimer == 0) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 300) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 600) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 900) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 1200) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 1500) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 1800) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 2100) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
 
       } else if (codeWheelTimer == 2850) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 3150) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 3450) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 3750) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 4050) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 4350) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 4650) {
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 4950) {
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 14950) {
         codeWheelTimer = -1;
       }
     
     } else if (codeWheel == 3) { //continuous
-      digitalWrite(hornPin, LOW);
+      digitalWrite(hornRelay, LOW);
     } else if (codeWheel == 5) {
       if (codeWheelTimer == 0){ //marchtime slower
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 500){
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 1000){
         codeWheelTimer = -1;
       }
 
     } else if (codeWheel == 4) {
       if (codeWheelTimer == 0){ //california code
-        digitalWrite(hornPin, LOW);
+        digitalWrite(hornRelay, LOW);
       } else if (codeWheelTimer == 10000){
-        digitalWrite(hornPin, HIGH);
+        digitalWrite(hornRelay, HIGH);
       } else if (codeWheelTimer == 15000){
         codeWheelTimer = -1;
       }
@@ -618,15 +636,15 @@ void alarm(){
     alarmLedTimer++;
     if (alarmLedTimer >= 750){
       if (digitalRead(25) == false){
-        digitalWrite(alarmLedPin, HIGH);
+        digitalWrite(alarmLed, HIGH);
         alarmLedTimer = 0;
       } else {
-        digitalWrite(alarmLedPin, LOW);
+        digitalWrite(alarmLed, LOW);
         alarmLedTimer = 0;
       }
     }
   } else {
-    digitalWrite(hornPin, HIGH);
+    digitalWrite(hornRelay, HIGH);
     codeWheelTimer = 0;
   }
 }
@@ -689,7 +707,7 @@ void lcdUpdate(){
       lcd.print("S. Wlk Test - "+(String)walkTestCount);
     }
     currentScreen = 5;
-    digitalWrite(readyLedPin, LOW); //ready led off for walk test
+    digitalWrite(readyLed, LOW); //ready led off for walk test
   }
 }
 void config(){
@@ -1061,7 +1079,7 @@ void config(){
       configTop = (String)mainPanelSettings[0];
       configBottom = (String)mainPanelSettings[1];
     } else if (drillPressed == true and drillStillPressed == false){
-      digitalWrite(readyLedPin, LOW); //ready LED
+      digitalWrite(readyLed, LOW); //ready LED
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("RESETTING TO");
