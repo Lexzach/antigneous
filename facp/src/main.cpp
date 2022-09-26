@@ -39,6 +39,7 @@ int drill = 0; //number to keep track of ms for drill
 //------ void loop delays to lessen load
 int deviceCheckTimer = 0;
 int keyCheckTimer = 0;
+int lcdCheckTimer = 0;
 //------ void loop delays to lessen load
 int troubleTimer = 0; //ms for trouble
 int codeWheelTimer = 0; //code wheel timing variable
@@ -58,6 +59,16 @@ String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
 String currentConfigBottom;
+byte lock[] = { //lock icon
+  B01110,
+  B10001,
+  B10001,
+  B11111,
+  B11011,
+  B11011,
+  B11111,
+  B00000
+};
 
 //Default EEPROM values in the case that the EEPROM fails to load
 bool keyRequired = false; //determine if key switch is required to operate buttons
@@ -203,6 +214,7 @@ void setup() {
 
   Serial.println("Initializing LCD...");
   lcd.init(); //initialize LCD
+  lcd.createChar(0, lock); //create the lock character
   lcd.backlight();
 
 //----------------------------------------------------------------------------- EEPROM RESET BUTTONS
@@ -334,7 +346,7 @@ void setup() {
   verificationTime = EEPROM.read(10)*10;
   //resistorLenience = EEPROM.read(72)*4; DEPRECATED
   panelHomescreen = EEPROM.read(78);
-  lcdTimeout = EEPROM.read(80)*15000;
+  lcdTimeout = EEPROM.read(80)*300;
   int x=0;
   for (int i=11; i<=26; i++){ //read panel name
     if (EEPROM.read(i) != 0){
@@ -383,9 +395,22 @@ void activateNAC(){
 
 void checkKey(){
   if (digitalRead(keySwitchPin) == HIGH){
+    if (keyInserted == false and keyRequired == true){
+      currentScreen=-1;
+    }
     keyInserted = true;
   } else {
-    keyInserted = false;
+    if (keyInserted == true and keyRequired == true){
+      currentScreen=-1;
+      keyInserted = false;
+      drillPressed=false;
+      silencePressed=false; //make sure all buttons are registered as depressed after key is removed
+      resetPressed=false;
+      drillStillPressed=false;
+      resetStillPressed=false;
+      silenceStillPressed=false;
+      drill = 0;
+    }
   }
 }
 
@@ -677,8 +702,14 @@ void lcdUpdate(){
   if (trouble==false and fullAlarm==false and horn==false and strobe==false and walkTest == false and currentScreen != 0 and drill == 0){
       lcd.noAutoscroll();
       lcd.clear();
-      lcd.setCursor(2,0);
-      lcd.print("System Normal");
+      if (keyRequired == true and keyInserted == false){
+        lcd.setCursor(0,0);
+        lcd.write(byte(0));
+        lcd.print(" System Normal");
+      } else {
+        lcd.setCursor(2,0);
+        lcd.print("System Normal");
+      }
       lcd.setCursor(0,1);
       if (panelHomescreen == 0){
         lcd.print(panelName);
@@ -960,19 +991,19 @@ void config(){
         configTop = (String)mainPanelSettings[1];
         if (lcdTimeout == 0){
           configBottom = (String)mainPanelSettings[2] + "off";
-        } else if (lcdTimeout<=30000) {
-          configBottom = (String)mainPanelSettings[2] + lcdTimeout/1000+"s";
+        } else if (lcdTimeout<6000) {
+          configBottom = (String)mainPanelSettings[2] + lcdTimeout/20+"s";
         } else {
-          configBottom = (String)mainPanelSettings[2] + lcdTimeout/60000+"m";
+          configBottom = (String)mainPanelSettings[2] + lcdTimeout/1200+"m";
         }
       } else if (cursorPosition == 1) {
         cursorPosition = 2;
         if (lcdTimeout == 0){
           configTop = (String)mainPanelSettings[2] + "off";
-        } else if (lcdTimeout<=30000) {
-          configTop = (String)mainPanelSettings[2] + lcdTimeout/1000+"s";
+        } else if (lcdTimeout<6000) {
+          configTop = (String)mainPanelSettings[2] + lcdTimeout/20+"s";
         } else {
-          configTop = (String)mainPanelSettings[2] + lcdTimeout/60000+"m";
+          configTop = (String)mainPanelSettings[2] + lcdTimeout/1200+"m";
         }
         configBottom = (String)mainPanelSettings[3];
 
@@ -1009,7 +1040,7 @@ void config(){
       } else if (cursorPosition == 1) {
         configPage = 9;
         cursorPosition = 0;
-        if (keyRequired == true){
+        if (keyRequiredVisual == true){
           configTop = (String)mainPanelSettingsPanelSecurity[0];
           configBottom = (String)mainPanelSettingsPanelSecurity[1]+"*";
         } else {
@@ -1018,31 +1049,31 @@ void config(){
         }
       } else if (cursorPosition == 2) {
         if (lcdTimeout == 0){
-          lcdTimeout = 15000;
+          lcdTimeout = 300;
           EEPROM.write(80,1);
-        } else if (lcdTimeout == 15000){
-          lcdTimeout = 30000;
+        } else if (lcdTimeout == 300){
+          lcdTimeout = 600;
           EEPROM.write(80,2);
-        } else if (lcdTimeout == 30000){
-          lcdTimeout = 60000;
+        } else if (lcdTimeout == 600){
+          lcdTimeout = 1200;
           EEPROM.write(80,4);
-        } else if (lcdTimeout == 60000){
-          lcdTimeout = 300000;
+        } else if (lcdTimeout == 1200){
+          lcdTimeout = 6000;
           EEPROM.write(80,20);
-        } else if (lcdTimeout == 300000){
-          lcdTimeout = 600000;
+        } else if (lcdTimeout == 6000){
+          lcdTimeout = 12000;
           EEPROM.write(80,40);
-        } else if (lcdTimeout >= 600000){
+        } else if (lcdTimeout >= 12000){
           lcdTimeout = 0;
           EEPROM.write(80,0);
         }
         EEPROM.commit();
         if (lcdTimeout == 0){
           configTop = (String)mainPanelSettings[2] + "off";
-        } else if (lcdTimeout<=30000) {
-          configTop = (String)mainPanelSettings[2] + lcdTimeout/1000+"s";
+        } else if (lcdTimeout<6000) {
+          configTop = (String)mainPanelSettings[2] + lcdTimeout/20+"s";
         } else {
-          configTop = (String)mainPanelSettings[2] + lcdTimeout/60000+"m";
+          configTop = (String)mainPanelSettings[2] + lcdTimeout/1200+"m";
         }
       } else if (cursorPosition == 3){
         configBottom = "drill = yes";
@@ -1346,7 +1377,8 @@ void config(){
     drillStillPressed = true;
   }
 }
-void loop() {
+
+void lcdBacklight(){
   if (lcdTimeout!=0){
     if (lcdTimeout <= lcdTimeoutTimer and backlightOn == true){
       lcd.noBacklight();
@@ -1362,7 +1394,19 @@ void loop() {
       backlightOn = true;
     }
   }
-  delay(1);
+}
+
+void loop() {
+  delay(1); //-------------------- SYSTEM CLOCK
+
+//------------------------------------------------------ CHECK LCD BACKLIGHT 
+  if (lcdCheckTimer >= 50){
+    lcdBacklight(); 
+    lcdCheckTimer = 0;
+  } else {
+    lcdCheckTimer++;
+  }
+//------------------------------------------------------ CHECK LCD BACKLIGHT 
 
 //------------------------------------------------------ CHECK KEY 
   if (keyCheckTimer >= 10){
@@ -1381,17 +1425,19 @@ void loop() {
     deviceCheckTimer++;
   }
 //------------------------------------------------------ CHECK ACTIVATING DEVICES
+  
+  troubleCheck(); //trouble check
+
+  alarm(); //alarm codewheel
 
 //------------------------------------------------------ CHECK BUTTONS
-  if ((keyInserted == true or keyRequired == false) and configMenu == false){
+  if (((keyInserted == true and keyRequired == true) or (keyInserted==false and keyRequired==false)) and configMenu == false){
     checkButtons(); //check if certain buttons are pressed
   }
-  troubleCheck(); //trouble check
-  alarm(); //alarm codewheel
   if (configMenu==false){
     lcdUpdate();
   } else if (configMenu==true) {
-    if (keyInserted == true or keyRequired == false){
+    if ((keyInserted == true and keyRequired == true) or (keyInserted==false and keyRequired==false)){
       config();
     }
   }
