@@ -52,9 +52,9 @@ int walkTestSmokeDetectorTimer = 0;
 int currentScreen = -1; //update display if previous screen is not the same
 int configPage = 0; //config page for the config menu
 int cursorPosition = 0; //which menu item the cursor is over
-int zerosCounted = 0; //verification variable
-int walkTestCount = 0; //keep track of walk test activations
-int zoneAlarm = 0; //which zone is in alarm 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2 
+int zone1Count = 0; //walk test variables
+int zone2Count = 0;
+int zoneAlarm = 0; //which zone is in alarm 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2 | 4 - drill
 String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
@@ -91,7 +91,7 @@ bool audibleSilence = true;
 int smokeDetectorTimeout = 5; //how long should smoke detector pre-alarm wait before cancelling the pre-alarm
 int firstStageTime = 1; //time in minutes that first stage should last
 int codeWheel = 0; //which alarm pattern to use, code-3 default
-int verificationTime = 250;
+int verificationTime = 2500;
 //int resistorLenience = 0; DEPRECATED
 int panelHomescreen = 0;
 int lcdTimeout = 0;
@@ -134,7 +134,7 @@ int sdaPin = 21;
 
 //maybe instead of looking for 0s for activation, simply look for a dip in voltage
 
-
+//REMOVE STUPID ZERO COUNTER, ITS OBSELETE 
 
 
 
@@ -385,7 +385,7 @@ void setup() {
 }
 
 
-
+//---------------------------------------------------------------------------------------- functions for turning certain things on and off
 void tone() {
   ledcSetup(0, 5000, 8); // setup beeper
   ledcAttachPin(buzzerPin, 0); // attach beeper
@@ -396,6 +396,28 @@ void noTone() {
   ledcAttachPin(buzzerPin, 0); // attach beeper
   ledcWriteTone(0, 0); // stop tone
 }
+void hornOn(bool on){
+  if (on == true){
+    digitalWrite(hornRelay, LOW); //turn on horn relay
+  } else {
+    digitalWrite(hornRelay, HIGH); //turn off horn relay
+  }
+}
+void strobeOn(bool on){
+  if (on == true){
+    digitalWrite(strobeRelay, LOW); //turn on strobe relay
+  } else {
+    digitalWrite(strobeRelay, HIGH); //turn off strobe relay
+  }
+}
+void smokeDetectorOn(bool on){
+  if (on == true){
+    digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+  } else {
+    digitalWrite(smokeDetectorRelay, HIGH); //turn off smoke relay
+  }
+}
+//---------------------------------------------------------------------------------------- functions for turning certain things on and off
 
 void activateNAC(){
   horn = true;
@@ -434,23 +456,25 @@ void checkDevices(){
   if (debug == true){
     Serial.println(analogRead(zone1Pin));
   }
-  if (walkTest == 0){
+  if (walkTest == false){
     if ((analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0) and horn != true and silenced==false){
       possibleAlarm = true;
     } 
 
     if (possibleAlarm == true and horn != true and strobe != true and silenced==false and isVerification == true){ //verification code
-      if (analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0){
-        zerosCounted++;
-      }
       if (verification >= verificationTime){
-        if (zerosCounted > 0.1*verificationTime and analogRead(zone1Pin) == 0 and analogRead(zone2Pin) == 0){
+        if (analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0){
+          if (analogRead(zone1Pin) == 0 and analogRead(zone2Pin) == 0){
+            zoneAlarm = 3; //both
+          } else if (analogRead(zone2Pin) == 0){
+            zoneAlarm = 2; //z2
+          } else {
+            zoneAlarm = 1; //z1
+          }
           definiteAlarm = true;
           possibleAlarm = false;
-          zerosCounted = 0;
           verification = 0;
         } else {
-          zerosCounted = 0;
           possibleAlarm = false;
           verification = 0;
         }
@@ -459,29 +483,35 @@ void checkDevices(){
       }
     }
   } else if (walkTest == true){
-    if (analogRead(zone1Pin) == 0){// or analogRead(zone2Pin) == 0){
-      walkTestCount++;
-      walkTestSmokeDetectorTimer = 0;
-      while (analogRead(zone1Pin) == 0) {// or analogRead(zone2Pin) <= resistorLenience) { --------------------------------- SOMEHOW FIX THIS, terribly designed devices that add voltage into the system can screw this up
-        digitalWrite(strobeRelay, LOW);
-        if (silentWalkTest == false){
-          digitalWrite(hornRelay, LOW);
-        }
-        digitalWrite(alarmLed, HIGH);
-        walkTestSmokeDetectorTimer++;
-        if (walkTestSmokeDetectorTimer >= 500){
-          digitalWrite(smokeDetectorRelay, HIGH);
-        }
-        delay(1);
+    if (analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0){// or analogRead(zone2Pin) == 0){
+      if (analogRead(zone1Pin) == 0){
+        zone1Count++;
+        smokeDetectorOn(false);
+        strobeOn(true);
+        delay(500);
+        hornOn(true);
+        delay(500);
+        hornOn(false);
+        delay(3000);
+        strobeOn(false);
+        smokeDetectorOn(true);
+      } else if (analogRead(zone2Pin) == 0){
+        zone2Count++;
+        smokeDetectorOn(false);
+        strobeOn(true);
+        delay(500);
+        hornOn(true);
+        delay(500);
+        hornOn(false);
+        delay(500);
+        hornOn(true);
+        delay(500);
+        hornOn(false);
+        delay(3000);
+        strobeOn(false);
+        smokeDetectorOn(true);
       }
-      digitalWrite(strobeRelay, HIGH);
-      if (silentWalkTest == false){
-        digitalWrite(hornRelay, HIGH);
-      }
-      digitalWrite(alarmLed, LOW);
       currentScreen = -1;
-      delay(250);
-      digitalWrite(smokeDetectorRelay, LOW);
     }
   }
 
@@ -523,13 +553,6 @@ void troubleCheck(){
     }
 
   } else {
-    if (walkTest == false){
-      digitalWrite(readyLed, HIGH);
-      readyLedStatus = true;
-    }
-    if (troubleLedTimer != 0){
-      noTone();
-    }
     troubleLedTimer=0;
   }
 }
@@ -545,9 +568,9 @@ void reboot(){
     digitalWrite(readyLed, HIGH); //ready LED
     digitalWrite(silenceLed, HIGH); //silence LED
     digitalWrite(alarmLed, HIGH); //alarm LED
-    digitalWrite(hornRelay, HIGH); //horn
-    digitalWrite(strobeRelay, HIGH); //strobe
-    digitalWrite(smokeDetectorRelay, HIGH); //smoke relay
+    hornOn(false); //horn
+    strobeOn(false); //strobe
+    smokeDetectorOn(false); //smoke relay
     lcd.backlight();
     delay(2500);
     noTone();
@@ -561,14 +584,16 @@ void reboot(){
 
 //----------------------------------------------------------------------------- BUTTON CHECK
 void checkButtons(){
-  if (digitalRead(resetButtonPin) == HIGH){ //RESET BUTTON
+  if (digitalRead(resetButtonPin) == HIGH){ //-----------------------------------------------------------RESET BUTTON
     reboot();
   }
 
-  if (digitalRead(silenceButtonPin) == HIGH){ //SILENCE BUTTON
+  if (digitalRead(silenceButtonPin) == HIGH){ //---------------------------------------------------------SILENCE BUTTON
     if (horn == true){ //if horns are not silenced, silence the horns
       digitalWrite(silenceLed, HIGH);
       digitalWrite(alarmLed, LOW);
+      digitalWrite(readyLed, LOW);
+      readyLedStatus = false;
       horn = false;
       if (audibleSilence == false){
         strobe = false;
@@ -596,8 +621,9 @@ void checkButtons(){
     silencePressed = false;
   }
 
-  if (digitalRead(drillButtonPin) == HIGH and horn != true){ //DRILL BUTTON
+  if (digitalRead(drillButtonPin) == HIGH and horn != true and silenced != true){ //------------------------------------------DRILL BUTTON
     if (drill >= 5000){
+      zoneAlarm = 4;
       activateNAC();
     } else {
       drill++;
@@ -614,25 +640,25 @@ void checkButtons(){
 //----------------------------------------------------------------------------- NAC ACTIVATION
 void alarm(){
   if (strobe == true){
-    digitalWrite(strobeRelay, LOW);
+    strobeOn(true);
   }else{
-    digitalWrite(strobeRelay,HIGH);
+    strobeOn(false);
   }
   if (horn == true){
     if (codeWheel == 0){
 
       if (codeWheelTimer == 0){ //temporal code 3 
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 500) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 1000) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 1500) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 2000) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 2500) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 4000) {
         codeWheelTimer = -1;
       }
@@ -641,9 +667,9 @@ void alarm(){
     } else if (codeWheel == 1) {
 
       if (codeWheelTimer == 0){ //marchtime
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 250){
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 500){
         codeWheelTimer = -1;
       }
@@ -651,58 +677,58 @@ void alarm(){
     } else if (codeWheel == 2) { //4-4
       
       if (codeWheelTimer == 0) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 300) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 600) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 900) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 1200) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 1500) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 1800) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 2100) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
 
       } else if (codeWheelTimer == 2850) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 3150) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 3450) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 3750) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 4050) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 4350) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 4650) {
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 4950) {
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 14950) {
         codeWheelTimer = -1;
       }
     
     } else if (codeWheel == 3) { //continuous
-      digitalWrite(hornRelay, LOW);
+      hornOn(true);
     } else if (codeWheel == 5) {
       if (codeWheelTimer == 0){ //marchtime slower
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 500){
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 1000){
         codeWheelTimer = -1;
       }
 
     } else if (codeWheel == 4) {
       if (codeWheelTimer == 0){ //california code
-        digitalWrite(hornRelay, LOW);
+        hornOn(true);
       } else if (codeWheelTimer == 10000){
-        digitalWrite(hornRelay, HIGH);
+        hornOn(false);
       } else if (codeWheelTimer == 15000){
         codeWheelTimer = -1;
       }
@@ -710,19 +736,26 @@ void alarm(){
     }
 
     codeWheelTimer++;
+  } else {
+    hornOn(false);
+    codeWheelTimer = 0;
+  }
+  if (fullAlarm == true){
     alarmLedTimer++;
     if (alarmLedTimer >= 750){
-      if (digitalRead(25) == false){
+      if (digitalRead(alarmLed) == false){
+        if (silenced == true){
+          tone();
+        }
         digitalWrite(alarmLed, HIGH);
-        alarmLedTimer = 0;
       } else {
+        if (silenced == true){
+          noTone();
+        }
         digitalWrite(alarmLed, LOW);
-        alarmLedTimer = 0;
       }
+      alarmLedTimer = 0;
     }
-  } else {
-    digitalWrite(hornRelay, HIGH);
-    codeWheelTimer = 0;
   }
 }
 //----------------------------------------------------------------------------- NAC ACTIVATION
@@ -765,16 +798,45 @@ void lcdUpdate(){
   } else if (fullAlarm == true and silenced == false and currentScreen != 3){
     lcd.clear();
     lcd.setCursor(1,0);
-    lcd.print("* FIRE ALARM *");
-    // lcd.setCursor(2,1);
-    // lcd.print("Zone 1");
+    if (keyRequired == true and keyInserted == false){
+      lcd.setCursor(0,0);
+      lcd.write(byte(0));
+      lcd.print("* FIRE ALARM *");
+    } else {
+      lcd.setCursor(1,0);
+      lcd.print("* FIRE ALARM *");
+    }
+    lcd.setCursor(0,1);
+    if (zoneAlarm == 1){
+      lcd.print("Zone 1");
+    } else if (zoneAlarm == 2){
+      lcd.print("Zone 2");
+    } else if (zoneAlarm == 3){
+      lcd.print("Zone 1 & Zone 2");
+    } else if (zoneAlarm == 4){
+      lcd.print("Fire Drill");
+    }
     currentScreen = 3;
   } else if (silenced == true and currentScreen != 4){
     lcd.clear();
-    lcd.setCursor(1,0);
-    lcd.print("* FIRE ALARM *");
-    lcd.setCursor(1,1);
-    lcd.print("-- SILENCED --");
+    if (keyRequired == true and keyInserted == false){
+      lcd.setCursor(0,0);
+      lcd.write(byte(0));
+      lcd.print("-- SILENCED --");
+    } else {
+      lcd.setCursor(1,0);
+      lcd.print("-- SILENCED --");
+    }
+    lcd.setCursor(0,1);
+    if (zoneAlarm == 1){
+      lcd.print("Zone 1");
+    } else if (zoneAlarm == 2){
+      lcd.print("Zone 2");
+    } else if (zoneAlarm == 3){
+      lcd.print("Zone 1 & Zone 2");
+    } else if (zoneAlarm == 4){
+      lcd.print("Fire Drill");
+    }
     // lcd.setCursor(2,1);
     // lcd.print("Zone 1");
     currentScreen = 4;
@@ -783,13 +845,10 @@ void lcdUpdate(){
     lcd.setCursor(0,0);
     lcd.print("* Supervisory *");
     lcd.setCursor(0,1);
-    if (silentWalkTest == false){
-      lcd.print("Walk Test - "+(String)walkTestCount);
-    } else {
-      lcd.print("S. Wlk Test - "+(String)walkTestCount);
-    }
+    lcd.print("Z1:"+(String)zone1Count+" Z2:"+(String)zone2Count);
     currentScreen = 5;
     digitalWrite(readyLed, LOW); //ready led off for walk test
+    readyLedStatus = false;
   } else if (drillPressed == true and fullAlarm == false and horn == false and strobe == false and walkTest == false and currentScreen != 6) {
     lcd.clear();
     lcd.setCursor(0,0);
@@ -895,14 +954,16 @@ void config(){
           silencePressed = true;
           configMenu = false;
           currentScreen=-1;
-          walkTestCount = 0;
+          zone1Count = 0;
+          zone2Count = 0;
         } else if (cursorPosition == 1) {
           walkTest = true;
           silentWalkTest = true;
           silencePressed = true;
           configMenu = false;
           currentScreen=-1;
-          walkTestCount = 0;
+          zone1Count = 0;
+          zone2Count = 0;
         } else if (cursorPosition == 2) {
           if (strobe == false){
             strobe = true;
@@ -1410,7 +1471,7 @@ void config(){
       // if (configTop.indexOf("*")>0){ //replace any "*" with nothing, then add a check mark to the end
       //   lcd.print("]" + configTop.replace("*",""));
         
-      // } else {                               //---------------------------------------------------------------------------------------- experimental code for check
+      // } else {                               //---------------------------------------------------------------------------------------- experimental code for check mark
         lcd.print("]" + configTop);
       //}
     } else {
