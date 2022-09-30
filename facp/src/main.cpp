@@ -29,7 +29,6 @@ bool silenceStillPressed = false; //make sure that presses don't count more than
 bool drillStillPressed = false;
 bool updateScreen = false; //updating the screen in the config menu
 bool possibleAlarm = false; //panel receieved 0 from pull station ciruit and is now investigating
-bool definiteAlarm = false; //panel has investigated and determined that it was not a fluke
 bool walkTest = false; //is the system in walk test
 bool silentWalkTest = false;
 bool backlightOn = true;
@@ -59,6 +58,8 @@ String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
 String currentConfigBottom;
+
+//---------------------------------------- CUSTOM LCD CHARACTERS
 byte lock[] = { //lock icon
   B01110,
   B10001,
@@ -81,6 +82,18 @@ byte check[] = { //check mark icon
   B00000
 };
 
+byte cross[] = { //x mark
+  B00000,
+  B11011,
+  B01110,
+  B00100,
+  B01110,
+  B11011,
+  B00000,
+  B00000
+};
+//---------------------------------------- CUSTOM LCD CHARACTERS
+
 //Default EEPROM values in the case that the EEPROM fails to load
 bool keyRequired = false; //determine if key switch is required to operate buttons
 bool isVerification = true; //is verification turned on
@@ -91,7 +104,7 @@ bool audibleSilence = true;
 int smokeDetectorTimeout = 5; //how long should smoke detector pre-alarm wait before cancelling the pre-alarm
 int firstStageTime = 1; //time in minutes that first stage should last
 int codeWheel = 0; //which alarm pattern to use, code-3 default
-int verificationTime = 2500;
+float verificationTime = 2500;
 //int resistorLenience = 0; DEPRECATED
 int panelHomescreen = 0;
 int lcdTimeout = 0;
@@ -227,7 +240,9 @@ void setup() {
   lcd.init(); //initialize LCD
   lcd.createChar(0, lock); //create the lock character
   lcd.createChar(1, check); //create the lock character
+  lcd.createChar(2, cross); //create the lock character
   
+
   lcd.backlight();
 
 //----------------------------------------------------------------------------- EEPROM RESET BUTTONS
@@ -451,7 +466,7 @@ void checkKey(){
   }
 }
 
-//----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES
+//----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES [!THIS CODE MUST WORK!]
 void checkDevices(){
   if (debug == true){
     Serial.println(analogRead(zone1Pin));
@@ -461,8 +476,8 @@ void checkDevices(){
       possibleAlarm = true;
     } 
 
-    if (possibleAlarm == true and horn != true and strobe != true and silenced==false and isVerification == true){ //verification code
-      if (verification >= verificationTime){
+    if (possibleAlarm == true and horn != true and strobe != true and silenced==false){
+      if (verification >= verificationTime or isVerification == false){
         if (analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0){
           if (analogRead(zone1Pin) == 0 and analogRead(zone2Pin) == 0){
             zoneAlarm = 3; //both
@@ -471,7 +486,7 @@ void checkDevices(){
           } else {
             zoneAlarm = 1; //z1
           }
-          definiteAlarm = true;
+          activateNAC();
           possibleAlarm = false;
           verification = 0;
         } else {
@@ -489,10 +504,16 @@ void checkDevices(){
         smokeDetectorOn(false);
         strobeOn(true);
         delay(500);
-        hornOn(true);
+        digitalWrite(alarmLed, HIGH);
+        if (silentWalkTest == false){
+          hornOn(true);
+        }
         delay(500);
-        hornOn(false);
+        if (silentWalkTest == false){
+          hornOn(false);
+        }
         delay(3000);
+        digitalWrite(alarmLed, LOW);
         strobeOn(false);
         smokeDetectorOn(true);
       } else if (analogRead(zone2Pin) == 0){
@@ -500,13 +521,23 @@ void checkDevices(){
         smokeDetectorOn(false);
         strobeOn(true);
         delay(500);
-        hornOn(true);
+        digitalWrite(alarmLed, HIGH);
+        if (silentWalkTest == false){
+          hornOn(true);
+        }
         delay(500);
-        hornOn(false);
+        if (silentWalkTest == false){
+          hornOn(false);
+        }
         delay(500);
-        hornOn(true);
+        if (silentWalkTest == false){
+          hornOn(true);
+        }
         delay(500);
-        hornOn(false);
+        if (silentWalkTest == false){
+          hornOn(false);
+        }
+        digitalWrite(alarmLed, LOW);
         delay(3000);
         strobeOn(false);
         smokeDetectorOn(true);
@@ -515,19 +546,18 @@ void checkDevices(){
     }
   }
 
-  if (definiteAlarm == true or (isVerification == false and analogRead(zone1Pin) == 0 and horn != true and silenced==false)){ //activate the horns and strobes after verification
-    activateNAC();
-    definiteAlarm = false;
-  } else if ((analogRead(zone1Pin) == 4095 or analogRead(zone2Pin) == 4095) and eolResistor == true and troubleTimer >= 200) {
-    trouble = true;
-    troubleType=1;
-  } else if ((analogRead(zone1Pin) == 4095 or analogRead(zone2Pin) == 4095) and eolResistor == true and troubleTimer <= 200){
-    troubleTimer++;
+  if ((analogRead(zone1Pin) == 4095 or analogRead(zone2Pin) == 4095) and eolResistor == true) {
+    if (troubleTimer >= 10){
+      trouble = true;
+      troubleType=1;
+    } else {
+      troubleTimer++;
+    }
   } else {
     troubleTimer = 0;
   }
 }
-//----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES
+//----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES [!THIS CODE MUST WORK!]
 
 
 //----------------------------------------------------------------------------- TROUBLE RESPONSE
@@ -862,8 +892,8 @@ void config(){
   char *main[] = {"Testing","Settings"}; //menu 0
   char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.: ","Keyless Sil."}; //menu 3
-  char *mainSettingsVerificationSettings[] = {"Verification: ","Verif. Time"}; //menu 4
+  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","Keyless Sil."}; //menu 3
+  char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:"}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","stage 1: ","Detector PreAlrm"}; //menu 6
   char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Tmeout: "}; //menu 7
@@ -947,6 +977,9 @@ void config(){
       configTop = (String)main[0];
       configBottom = (String)main[1];
       strobe = false;
+      smokeDetectorOn(true);
+      digitalWrite(readyLed,HIGH);
+      readyLedStatus = true;
     } else if (drillPressed == true and drillStillPressed == false){
         if (cursorPosition == 0){
           walkTest = true;
@@ -967,9 +1000,15 @@ void config(){
         } else if (cursorPosition == 2) {
           if (strobe == false){
             strobe = true;
+            smokeDetectorOn(false); //prevent (specifically cheap IR) smoke detectors from tripping from the strobe 
+            digitalWrite(readyLed,LOW);
+            readyLedStatus = false;
             configTop = (String)mainTesting[2]+" *";
           } else {
             strobe = false;
+            smokeDetectorOn(true);
+            digitalWrite(readyLed,HIGH);
+            readyLedStatus = true;
             configTop = (String)mainTesting[2];
           }
         }
@@ -1019,10 +1058,14 @@ void config(){
         cursorPosition = 2;
         configTop = (String)mainSettingsFireAlarmSettings[2];
         configBottom = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
       } else if (cursorPosition == 2) {
         cursorPosition = 3;
         configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
         configBottom = (String)mainSettingsFireAlarmSettings[0];
+        configTop.replace("1","*");
+        configTop.replace("0","$");
       } else if (cursorPosition == 3) {
         cursorPosition = 0;
         configTop = (String)mainSettingsFireAlarmSettings[0];
@@ -1051,8 +1094,14 @@ void config(){
       } else if (cursorPosition == 1) {
         configPage = 4;
         cursorPosition = 0;
-        configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
-        configBottom = (String)mainSettingsVerificationSettings[1];
+        configTop = (String)mainSettingsVerificationSettings[0] + isVerification;
+        if (isVerification == false){
+          configBottom = (String)mainSettingsVerificationSettings[1] + "off";
+        } else {
+          configBottom = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
       } else if (cursorPosition == 2) {
         configPage = 6;
         cursorPosition = 0;
@@ -1069,6 +1118,8 @@ void config(){
         EEPROM.commit();
         configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
         configBottom = (String)mainSettingsFireAlarmSettings[0];
+        configTop.replace("1","*");
+        configTop.replace("0","$");
       }
     }
 //----------------------------------------------------------------------------- SETTINGS > FIRE ALARM
@@ -1173,7 +1224,7 @@ void config(){
         configPage = 12;
         cursorPosition = 0;
         configTop = (String)mainPanelSettingsAbout[0];
-        configBottom = (String)mainPanelSettingsAbout[1]+firmwareRev;
+        configBottom = (String)mainPanelSettingsAbout[1] + firmwareRev;
       }
     }
 //----------------------------------------------------------------------------- SETTINGS > PANEL
@@ -1357,12 +1408,24 @@ void config(){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){
         cursorPosition = 1;
-        configTop = (String)mainSettingsVerificationSettings[1];
+        if (isVerification == false){
+          configTop = (String)mainSettingsVerificationSettings[1] + "off";
+        } else {
+          configTop = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
+        }
         configBottom = (String)mainSettingsVerificationSettings[0]+isVerification;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
       } else if (cursorPosition == 1) {
         cursorPosition = 0;
         configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
-        configBottom = (String)mainSettingsVerificationSettings[1];
+        if (isVerification == false){
+          configBottom = (String)mainSettingsVerificationSettings[1] + "off";
+        } else {
+          configBottom = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
       }
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 3;
@@ -1380,9 +1443,42 @@ void config(){
         }
         EEPROM.commit();
         configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
-        configBottom = (String)mainSettingsVerificationSettings[1];
-      } else if (cursorPosition == 1) {
-        //computer do shit
+        if (isVerification == false){
+          configBottom = (String)mainSettingsVerificationSettings[1] + "off";
+        } else {
+          configBottom = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
+      } else if (cursorPosition == 1 and isVerification == true) {
+        if (verificationTime == 500){
+          verificationTime = 1000;
+          EEPROM.write(10,10);
+        } else if (verificationTime == 1000){
+          verificationTime = 1500;
+          EEPROM.write(10,15);
+        } else if (verificationTime == 1500){
+          verificationTime = 2500;
+          EEPROM.write(10,25);
+        } else if (verificationTime == 2500){
+          verificationTime = 4500;
+          EEPROM.write(10,45);
+        } else if (verificationTime == 4500){
+          verificationTime = 7500;
+          EEPROM.write(10,75);
+        } else if (verificationTime >= 7500){
+          verificationTime = 500;
+          EEPROM.write(10,5);
+        }
+        EEPROM.commit();
+        if (isVerification == false){
+          configTop = (String)mainSettingsVerificationSettings[1] + "off";
+        } else {
+          configTop = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
+        }
+        configBottom = (String)mainSettingsVerificationSettings[0]+isVerification;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
       }
   }
 //----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > VERIFICATION
@@ -1468,17 +1564,35 @@ void config(){
     lcd.clear();
     lcd.setCursor(0,0);
     if (configPage != -1){
-      // if (configTop.indexOf("*")>0){ //replace any "*" with nothing, then add a check mark to the end
-      //   lcd.print("]" + configTop.replace("*",""));
-        
-      // } else {                               //---------------------------------------------------------------------------------------- experimental code for check mark
+      if (configTop.indexOf("*")>0){ //RENDER TOP OF CONFIG WINDOW
+        configTop.replace("*","");
         lcd.print("]" + configTop);
-      //}
+        lcd.write(byte(1));
+        
+      } else if (configTop.indexOf("$")>0) {
+        configTop.replace("$","");
+        lcd.print("]" + configTop);
+        lcd.write(byte(2));
+      } else {
+        lcd.print("]" + configTop);
+      }
     } else {
       lcd.print(configTop);
     }
     lcd.setCursor(0,1);
-    lcd.print(configBottom);
+    if (configBottom.indexOf("*")>0){ //RENDER BOTTOM OF CONFIG WINDOW
+        configBottom.replace("*","");
+        lcd.print(configBottom);
+        lcd.write(byte(1));
+        
+    } else if (configBottom.indexOf("$")>0) {
+      configBottom.replace("$","");
+      lcd.print(configBottom);
+      lcd.write(byte(2));
+
+    } else {
+      lcd.print(configBottom);
+    }
     currentConfigTop = configTop;
     currentConfigBottom = configBottom;
     if (configPage == 10){
