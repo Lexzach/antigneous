@@ -35,6 +35,7 @@ bool backlightOn = true;
 bool keyRequiredVisual; //variable for panel security
 bool keylessSilence = false; //can the panel be silenced without a key
 bool debug = false;
+bool updateLockStatus = false; //if the screen needs to be updated for the lock/unlock icon
 int characters[] = {32,45,46,47,48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90}; //characters allowed on name
 int panelNameList[16];
 int clearTimer = 0; //timer for keeping track of button holding for clearing character in the name editor
@@ -56,6 +57,7 @@ int cursorPosition = 0; //which menu item the cursor is over
 int zone1Count = 0; //walk test variables
 int zone2Count = 0;
 int zoneAlarm = 0; //which zone is in alarm 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2 | 4 - drill
+int zoneTrouble = 0; //which zone is in trouble 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2
 String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
@@ -386,6 +388,12 @@ void setup() {
   Serial.println("Config loaded");
   digitalWrite(readyLed, HIGH); //power on ready LED on startup
   readyLedStatus = true;
+  updateLockStatus = true;
+  if (digitalRead(keySwitchPin) == HIGH and keyRequired == true){ //check the key status on startup
+    keyInserted = true;
+  } else {
+    keyInserted = false;
+  }
   digitalWrite(silenceLed, LOW);
   digitalWrite(alarmLed, LOW);
   digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
@@ -435,6 +443,8 @@ void activateNAC(){
   silenced = false;
   configMenu = false;
   tone();
+  digitalWrite(readyLed, HIGH);
+  readyLedStatus = true;
   digitalWrite(alarmLed, HIGH);
   digitalWrite(silenceLed, LOW);
 }
@@ -442,12 +452,11 @@ void activateNAC(){
 void checkKey(){
   if (digitalRead(keySwitchPin) == HIGH){
     if (keyInserted == false and keyRequired == true){
-      currentScreen=-1;
       keyInserted = true;
+      updateLockStatus = true;
     }
   } else {
     if (keyInserted == true and keyRequired == true){
-      currentScreen=-1;
       keyInserted = false;
       drillPressed=false;
       silencePressed=false; //make sure all buttons are registered as depressed after key is removed
@@ -456,6 +465,7 @@ void checkKey(){
       resetStillPressed=false;
       silenceStillPressed=false;
       drill = 0;
+      updateLockStatus = true;
     }
   }
 }
@@ -544,6 +554,13 @@ void checkDevices(){
     if (troubleTimer >= 10){
       trouble = true;
       troubleType=1;
+      if (analogRead(zone1Pin) == 4095 and analogRead(zone2Pin) == 4095){
+        zoneTrouble = 3;
+      } else if (analogRead(zone1Pin) == 4095){
+        zoneTrouble = 1;
+      } else {
+        zoneTrouble = 2;
+      }
     } else {
       troubleTimer++;
     }
@@ -556,7 +573,7 @@ void checkDevices(){
 
 //----------------------------------------------------------------------------- TROUBLE RESPONSE
 void troubleCheck(){
-  if (trouble == true){
+  if (trouble == true and fullAlarm == false and walkTest == false){
     if (troubleLedTimer >= 200){
       if (readyLedStatus == true){
         digitalWrite(readyLed, LOW);
@@ -578,6 +595,7 @@ void troubleCheck(){
 
   } else {
     troubleLedTimer=0;
+    zoneTrouble=0;
   }
 }
 //----------------------------------------------------------------------------- TROUBLE RESPONSE
@@ -785,17 +803,12 @@ void alarm(){
 //----------------------------------------------------------------------------- NAC ACTIVATION
 
 void lcdUpdate(){
+  
   if (trouble==false and fullAlarm==false and horn==false and strobe==false and walkTest == false and currentScreen != 0 and drill == 0){
       lcd.noAutoscroll();
       lcd.clear();
-      if (keyRequired == true and keyInserted == false){
-        lcd.setCursor(0,0);
-        lcd.write(byte(0));
-        lcd.print(" System Normal");
-      } else {
-        lcd.setCursor(2,0);
-        lcd.print("System Normal");
-      }
+      lcd.setCursor(2,0);
+      lcd.print("System Normal");
       lcd.setCursor(0,1);
       if (panelHomescreen == 0){
         lcd.print(panelName);
@@ -803,33 +816,10 @@ void lcdUpdate(){
         lcd.print(analogRead(zone1Pin));
       }
       currentScreen = 0;
-  } else if (trouble==true){
-    if (troubleType == 0 and currentScreen != 1){
-      lcd.clear();
-      lcd.setCursor(1,0);
-      lcd.print("* Trouble *");
-      lcd.setCursor(0,1);
-      lcd.print("Unknown");
-      currentScreen = 1;
-    } else if (troubleType == 1 and currentScreen != 2){
-      lcd.clear();
-      lcd.setCursor(1,0);
-      lcd.print("* Trouble *");
-      lcd.setCursor(0,1);
-      lcd.print("Ground Fault");
-      currentScreen = 2;
-    }
-  } else if (fullAlarm == true and silenced == false and currentScreen != 3){
+  }  else if (fullAlarm == true and silenced == false and currentScreen != 3){
     lcd.clear();
     lcd.setCursor(1,0);
-    if (keyRequired == true and keyInserted == false){
-      lcd.setCursor(0,0);
-      lcd.write(byte(0));
-      lcd.print("* FIRE ALARM *");
-    } else {
-      lcd.setCursor(1,0);
-      lcd.print("* FIRE ALARM *");
-    }
+    lcd.print("* FIRE ALARM *");
     lcd.setCursor(0,1);
     if (zoneAlarm == 1){
       lcd.print("Zone 1");
@@ -843,14 +833,8 @@ void lcdUpdate(){
     currentScreen = 3;
   } else if (silenced == true and currentScreen != 4){
     lcd.clear();
-    if (keyRequired == true and keyInserted == false){
-      lcd.setCursor(0,0);
-      lcd.write(byte(0));
-      lcd.print("-- SILENCED --");
-    } else {
-      lcd.setCursor(1,0);
-      lcd.print("-- SILENCED --");
-    }
+    lcd.setCursor(1,0);
+    lcd.print("-- SILENCED --");
     lcd.setCursor(0,1);
     if (zoneAlarm == 1){
       lcd.print("Zone 1");
@@ -866,7 +850,7 @@ void lcdUpdate(){
     currentScreen = 4;
   } else if (walkTest == true and currentScreen != 5) {
     lcd.clear();
-    lcd.setCursor(0,0);
+    lcd.setCursor(1,0);
     lcd.print("* Supervisory *");
     lcd.setCursor(0,1);
     lcd.print("Z1:"+(String)zone1Count+" Z2:"+(String)zone2Count);
@@ -880,6 +864,33 @@ void lcdUpdate(){
     lcd.setCursor(1,1);
     lcd.print("TO START DRILL");
     currentScreen = 6;
+  } else if (trouble==true and fullAlarm == false and drillPressed == false and walkTest == false and currentScreen != 1){
+    lcd.clear();
+    lcd.setCursor(2,0);
+    lcd.print("* Trouble *");
+    if (troubleType == 0){
+      lcd.setCursor(0,1);
+      lcd.print("Unknown");
+    } else if (troubleType == 1){
+      lcd.setCursor(0,1);
+      if (zoneTrouble == 3){
+        lcd.print("Gnd Fault Z1&Z2");
+      } else if (zoneTrouble == 2){
+        lcd.print("Gnd Fault Z2");
+      } else if (zoneTrouble == 1){
+        lcd.print("Gnd Fault Z1");
+      }
+    }
+    currentScreen = 1;
+  }
+  if (updateLockStatus == true and configMenu == false and keyRequired == true){
+    lcd.setCursor(0,0);
+    if (keyInserted == false){
+      lcd.write(byte(0));
+    } else {
+      lcd.print(" ");  
+    }
+    updateLockStatus = false;
   }
 }
 void config(){
@@ -1648,7 +1659,7 @@ void loop() {
 
     alarm(); //------------------------------------------------------------- ALARM CODEWHEEL
 
-    if (keyCheckTimer >= 250){
+    if (keyCheckTimer >= 100){
       checkKey(); //---------------------------------------------------------- CHECK KEY 
       keyCheckTimer = 0;
     } else {
