@@ -6,9 +6,9 @@
 unsigned long systemClock; //-----------------SYSTEM CLOCK [VERY IMPORTANT]
 unsigned long lastPulse; //-------------------LAST void loop() PULSE
 
-char *firmwareRev = "1.1"; //VERSION
+char *firmwareRev = "1.2"; //VERSION
 int EEPROMVersion = 1; //version control to rewrite eeprom after update
-int EEPROMBuild = 1;
+int EEPROMBuild = 2;
 
 
 //----------------------------------------------------------------------------- RUNTIME VARIABLES
@@ -33,6 +33,7 @@ bool walkTest = false; //is the system in walk test
 bool silentWalkTest = false;
 bool backlightOn = true;
 bool keyRequiredVisual; //variable for panel security
+bool keylessSilence = false; //can the panel be silenced without a key
 bool debug = false;
 int characters[] = {32,45,46,47,48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90}; //characters allowed on name
 int panelNameList[16];
@@ -40,6 +41,7 @@ int clearTimer = 0; //timer for keeping track of button holding for clearing cha
 int verification = 0; //number to keep track of ms for verification
 int drill = 0; //number to keep track of ms for drill
 int buttonCheckTimer = 0; //add a slight delay to avoid double-clicking buttons
+int keyCheckTimer = 0;
 int troubleTimer = 0; //ms for trouble
 int codeWheelTimer = 0; //code wheel timing variable
 int troubleLedTimer = 0; //number to keep track of ms for trouble light
@@ -130,27 +132,6 @@ int sdaPin = 21;
 //----------------------------------------------------------------------------- RUNTIME VARIABLES
 
 
-
-
-
-
-
-
-
-
-
-//get resistor lenience by having zone 1, zone 2, and smoke on a output pin instead of +3.3v so you can measure the difference
-
-//have it so holding down the drill button causes a visual indicator on the display along with blinking the alarm led really fast
-
-//Add feature to calibrate activating, trouble, and normal voltages using the IO output instead of 3.3v
-
-//maybe instead of looking for 0s for activation, simply look for a dip in voltage
-
-//REMOVE STUPID ZERO COUNTER, ITS OBSELETE 
-
-
-
 //----------------------------------------------------------------------------- EEPROM RESET
 void resetEEPROM() {
   for (int i=0; i<=1024; i++){ //write all 255's from 0-1024 address
@@ -177,6 +158,8 @@ void resetEEPROM() {
   }
   Serial.println("Wrote 6 blank spaces");
 
+  EEPROM.write(27,0); //write current version and build
+  Serial.println("Disabled keyless silence");
   EEPROM.write(50, EEPROMVersion); //write current version and build
   EEPROM.write(51, EEPROMBuild); 
   Serial.println("Wrote EEPROM version and build");
@@ -283,7 +266,7 @@ void setup() {
   lcd.setCursor(4,0);
   lcd.print("BOOTING...");
   lcd.setCursor(0,1);
-  lcd.print("I/O");
+  lcd.print("IO");
   delay(100);
 
   Serial.println("Configured all pins");
@@ -298,7 +281,11 @@ void setup() {
     Serial.println("EEPROM verification failed.");
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("ERROR 1");
+    if (EEPROM.read(50) != EEPROMVersion or EEPROM.read(51) != EEPROMBuild){
+      lcd.print("ERROR 2");
+    } else {
+      lcd.print("ERROR 1");
+    }
     lcd.setCursor(0,1); 
     lcd.print("check manual");
     while(digitalRead(resetButtonPin) == LOW and digitalRead(drillButtonPin) == LOW){ //wait until button is pressed
@@ -318,11 +305,13 @@ void setup() {
   lcd.setCursor(4,0);
   lcd.print("BOOTING...");
   lcd.setCursor(0,1);
-  lcd.print("I/O-SLFTST");
+  lcd.print("IO-SLFTST");
   delay(100);
 
   Serial.println("Current EEPROM dump:"); //dump EEPROM into serial monitor
   for (int i=0; i<=1024; i++){
+    Serial.print(i);
+    Serial.print(":");
     Serial.print(EEPROM.read(i));
     Serial.print(" ");
   }
@@ -369,6 +358,11 @@ void setup() {
   } else {
     audibleSilence = false;
   }
+  if (EEPROM.read(27) == 1){
+    keylessSilence = true;
+  } else {
+    keylessSilence = false;
+  }
   smokeDetectorTimeout = EEPROM.read(77)*60000;
   firstStageTime = EEPROM.read(75)*60000;
   verificationTime = EEPROM.read(10)*100;
@@ -387,7 +381,7 @@ void setup() {
   lcd.setCursor(4,0);
   lcd.print("BOOTING...");
   lcd.setCursor(0,1);
-  lcd.print("I/O-SLFTST-CONFIG");
+  lcd.print("IO-SLFTST-CONFIG");
   delay(100);
   Serial.println("Config loaded");
   digitalWrite(readyLed, HIGH); //power on ready LED on startup
@@ -652,7 +646,7 @@ void checkButtons(){
   }
 
   if (digitalRead(drillButtonPin) == HIGH and horn != true and silenced != true){ //------------------------------------------DRILL BUTTON
-    if (drill >= 5000){
+    if (drill >= 237){
       zoneAlarm = 4;
       activateNAC();
     } else {
@@ -892,16 +886,15 @@ void config(){
   char *main[] = {"Testing","Settings"}; //menu 0
   char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","Keyless Sil."}; //menu 3
+  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","Keyless Sil.:"}; //menu 3
   char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:"}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","stage 1: ","Detector PreAlrm"}; //menu 6
-  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Tmeout: "}; //menu 7
-  char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About","Calibration"}; //menu 8
+  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Timeout: "}; //menu 7
+  char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
   char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach"}; //menu 12
-  char *mainPanelSettingsCalibrate[] = {"Activated Zone 1", "Normal Zone 1", "Trouble Zone 1", "Activated Zone 2", "Normal Zone 2", "Trouble Zone 2"}; //menu 13
   
   
   // char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
@@ -1063,10 +1056,18 @@ void config(){
       } else if (cursorPosition == 2) {
         cursorPosition = 3;
         configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
+        configBottom = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        configTop.replace("1","*");
+        configTop.replace("0","$");
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
+      } else if (cursorPosition == 3){
+        cursorPosition = 4;
+        configTop = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
         configBottom = (String)mainSettingsFireAlarmSettings[0];
         configTop.replace("1","*");
         configTop.replace("0","$");
-      } else if (cursorPosition == 3) {
+      } else if (cursorPosition == 4) {
         cursorPosition = 0;
         configTop = (String)mainSettingsFireAlarmSettings[0];
         configBottom = (String)mainSettingsFireAlarmSettings[1];
@@ -1120,6 +1121,19 @@ void config(){
         configBottom = (String)mainSettingsFireAlarmSettings[0];
         configTop.replace("1","*");
         configTop.replace("0","$");
+      } else if (cursorPosition == 4){
+        if (keylessSilence == true){
+          keylessSilence = false;
+          EEPROM.write(27,0);
+        } else {
+          keylessSilence = true;
+          EEPROM.write(27,1);
+        }
+        EEPROM.commit();
+        configTop = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        configBottom = (String)mainSettingsFireAlarmSettings[0];
+        configTop.replace("1","*");
+        configTop.replace("0","$");
       }
     }
 //----------------------------------------------------------------------------- SETTINGS > FIRE ALARM
@@ -1155,12 +1169,8 @@ void config(){
       } else if (cursorPosition == 3) {
         cursorPosition = 4;
         configTop = (String)mainPanelSettings[4];
-        configBottom = (String)mainPanelSettings[5];
-      } else if (cursorPosition == 4) {
-        cursorPosition = 5;
-        configTop = (String)mainPanelSettings[5];
         configBottom = (String)mainPanelSettings[0];
-      } else if (cursorPosition == 5) {
+      } else if (cursorPosition == 4) {
         cursorPosition = 0;
         configTop = (String)mainPanelSettings[0];
         configBottom = (String)mainPanelSettings[1];
@@ -1551,26 +1561,18 @@ void config(){
   }
 
 
-  
-  // if (resetPressed == true and resetStillPressed == false){
-
-  // } else if (silencePressed == true and silenceStillPressed == false){
-
-  // } else if (drillPressed == true and drillStillPressed == false){
-  
-  // }
-
-  if (configTop != currentConfigTop or configBottom != currentConfigBottom){
+// ---------------------------------------------------------------------------- CONFIG SCREEN REDRAW
+  if (configTop != currentConfigTop or configBottom != currentConfigBottom){ //figure out if the screen *really* needs to be re-drawn
     lcd.clear();
-    lcd.setCursor(0,0);
+    lcd.setCursor(0,0); //RENDER TOP OF CONFIG WINDOW
     if (configPage != -1){
-      if (configTop.indexOf("*")>0){ //RENDER TOP OF CONFIG WINDOW
-        configTop.replace("*","");
+      if (configTop.indexOf("*")>0){ //Replace any "*" with a check mark
+        configTop.replace("*",""); 
         lcd.print("]" + configTop);
         lcd.write(byte(1));
         
-      } else if (configTop.indexOf("$")>0) {
-        configTop.replace("$","");
+      } else if (configTop.indexOf("$")>0) { //Replace any "$" with an X icon
+        configTop.replace("$",""); 
         lcd.print("]" + configTop);
         lcd.write(byte(2));
       } else {
@@ -1579,13 +1581,13 @@ void config(){
     } else {
       lcd.print(configTop);
     }
-    lcd.setCursor(0,1);
-    if (configBottom.indexOf("*")>0){ //RENDER BOTTOM OF CONFIG WINDOW
+    lcd.setCursor(0,1); //RENDER BOTTOM OF CONFIG WINDOW
+    if (configBottom.indexOf("*")>0){ //Replace any "*" with a check mark
         configBottom.replace("*","");
         lcd.print(configBottom);
         lcd.write(byte(1));
         
-    } else if (configBottom.indexOf("$")>0) {
+    } else if (configBottom.indexOf("$")>0) { //Replace any "$" with an X icon
       configBottom.replace("$","");
       lcd.print(configBottom);
       lcd.write(byte(2));
@@ -1600,9 +1602,9 @@ void config(){
     }
     
   }
-  
+// ---------------------------------------------------------------------------- CONFIG SCREEN REDRAW
 
-
+// --------- UPDATE BUTTON VARIABLES
   if (digitalRead(resetButtonPin) == HIGH){ //RESET BUTTON
     resetStillPressed = true;
   }
@@ -1612,6 +1614,7 @@ void config(){
   if (digitalRead(drillButtonPin) == HIGH){ //DRILL BUTTON
     drillStillPressed = true;
   }
+// --------- UPDATE BUTTON VARIABLES
 }
 
 void lcdBacklight(){
@@ -1635,38 +1638,43 @@ void lcdBacklight(){
 void loop() {
   systemClock = millis(); //-------------------- SYSTEM CLOCK
   if (systemClock-lastPulse >= 1){
-  //------------------------------------------------------ CHECK LCD BACKLIGHT 
 
-    lcdBacklight(); 
+    lcdBacklight(); //------------------------------------------------------ CHECK LCD BACKLIGHT 
 
-  //------------------------------------------------------ CHECK LCD BACKLIGHT 
 
-  //------------------------------------------------------ CHECK KEY 
-    checkKey(); 
-  //------------------------------------------------------ CHECK KEY 
-
-  //------------------------------------------------------ CHECK ACTIVATING DEVICES
-
-    checkDevices();
-
-  //------------------------------------------------------ CHECK ACTIVATING DEVICES
+    checkDevices(); //------------------------------------------------------ CHECK ACTIVATING DEVICES
     
-    troubleCheck(); //trouble check
+    troubleCheck(); //------------------------------------------------------ TROUBLE CHECK
 
-    alarm(); //alarm codewheel
+    alarm(); //------------------------------------------------------------- ALARM CODEWHEEL
 
-  //------------------------------------------------------ CHECK BUTTONS
-    if (((keyInserted == true and keyRequired == true) or (keyInserted==false and keyRequired==false)) and configMenu == false){
-      checkButtons(); //check if certain buttons are pressed
+    if (keyCheckTimer >= 250){
+      checkKey(); //---------------------------------------------------------- CHECK KEY 
+      keyCheckTimer = 0;
+    } else {
+      keyCheckTimer++;
     }
-  //------------------------------------------------------ CHECK BUTTONS
-
-
-  //------------------------------------------------------ UPDATE LCD DISPLAY
     
     if (buttonCheckTimer >= 20){
       if (configMenu==false){
-        lcdUpdate();
+        if ((keyInserted == true and keyRequired == true) or (keyRequired==false)){
+          checkButtons(); //check if certain buttons are pressed
+        } else if (keylessSilence == true and fullAlarm == true and silenced == false){
+          if (digitalRead(silenceButtonPin) == HIGH){
+            digitalWrite(silenceLed, HIGH);
+            digitalWrite(alarmLed, LOW);
+            digitalWrite(readyLed, LOW);
+            readyLedStatus = false;
+            horn = false;
+            if (audibleSilence == false){
+              strobe = false;
+            }
+            silenced=true;
+            noTone();
+          }
+        }
+        lcdUpdate(); //------------------------------------------------------ UPDATE LCD DISPLAY
+
       } else if (configMenu==true) {
         if ((keyInserted == true and keyRequired == true) or (keyInserted==false and keyRequired==false)){
           config();
@@ -1676,8 +1684,6 @@ void loop() {
     } else {
       buttonCheckTimer++;
     }
-
-  //------------------------------------------------------ UPDATE LCD DISPLAY
 
     lastPulse = millis(); //update last pulse
   }
