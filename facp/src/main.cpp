@@ -21,12 +21,19 @@ bool strobe = false; //bool to control if the strobes are active
 bool trouble = false; //bool to control if the panel is in trouble
 bool troubleAck = false; //bool to control if the trouble is acknowledged
 bool configMenu = false; //determine if the control panel is in the configuration menu
+
+//---------------------------- Variables that are *always* true if a button is held down at all
 bool resetPressed = false;
-bool silencePressed = false; //make sure that presses don't count more than once
+bool silencePressed = false;
 bool drillPressed = false;
+//----------------------------
+
+//---------------------------- Variables that are false the *first* iteration through, caused by the variables above being true, this is handy for detecting single button presses, and not repeating code every loop
 bool resetStillPressed = false;
-bool silenceStillPressed = false; //make sure that presses don't count more than once
+bool silenceStillPressed = false;
 bool drillStillPressed = false;
+//----------------------------
+
 bool updateScreen = false; //updating the screen in the config menu
 bool possibleAlarm = false; //panel receieved 0 from pull station ciruit and is now investigating
 bool walkTest = false; //is the system in walk test
@@ -36,6 +43,7 @@ bool keyRequiredVisual; //variable for panel security
 bool keylessSilence = false; //can the panel be silenced without a key
 bool debug = false;
 bool updateLockStatus = false; //if the screen needs to be updated for the lock/unlock icon
+bool secondStage = false; //if the panel is in second stage
 int characters[] = {32,45,46,47,48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90}; //characters allowed on name
 int panelNameList[16];
 int clearTimer = 0; //timer for keeping track of button holding for clearing character in the name editor
@@ -62,6 +70,25 @@ String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
 String currentConfigBottom;
+bool keyRequired = false; //determine if key switch is required to operate buttons
+bool isVerification = true; //is verification turned on
+bool eolResistor = true; //is the EOL resistor enabled
+bool preAlarm = false; //use pre-alarm?
+bool smokeDetectorVerification = false; //should smoke detectors activate first stage
+bool smokeDetectorCurrentlyInVerification = false; //Is a smoke detector currently in verification?
+bool audibleSilence = true;
+int smokeDetectorVerificationTime = 60000; //how long to wait before toggling smoke detectors back on
+int smokeDetectorPostRestartTimer = 0; //variable to keep track of the 60 seconds post-power up that the panel watches the smoke detector
+int smokeDetectorTimer = 0; //timer to keep track of the current smoke detector timeout progress
+int firstStageTime = 300000; //time in minutes that first stage should last
+int firstStageTimer = 0; //timer to keep track of current first stage
+int codeWheel = 0; //which alarm pattern to use, code-3 default
+float verificationTime = 2500;
+//int resistorLenience = 0; DEPRECATED
+int panelHomescreen = 0;
+int lcdTimeout = 0;
+String panelName = "";
+LiquidCrystal_I2C lcd(0x27,16,2);
 
 //---------------------------------------- CUSTOM LCD CHARACTERS
 byte lock[] = { //lock icon
@@ -97,23 +124,6 @@ byte cross[] = { //x mark
   B00000
 };
 //---------------------------------------- CUSTOM LCD CHARACTERS
-
-//Default EEPROM values in the case that the EEPROM fails to load
-bool keyRequired = false; //determine if key switch is required to operate buttons
-bool isVerification = true; //is verification turned on
-bool eolResistor = true; //is the EOL resistor enabled
-bool preAlarm = false; //use pre-alarm?
-bool smokeDetectorPreAlarm = false; //should smoke detectors activate first stage
-bool audibleSilence = true;
-int smokeDetectorTimeout = 5; //how long should smoke detector pre-alarm wait before cancelling the pre-alarm
-int firstStageTime = 1; //time in minutes that first stage should last
-int codeWheel = 0; //which alarm pattern to use, code-3 default
-float verificationTime = 2500;
-//int resistorLenience = 0; DEPRECATED
-int panelHomescreen = 0;
-int lcdTimeout = 0;
-String panelName = "";
-LiquidCrystal_I2C lcd(0x27,16,2);
 
 //PINS
 int zone1Pin = 15;
@@ -171,12 +181,12 @@ void resetEEPROM() {
   Serial.println("Enabled EOL resistor");
   EEPROM.write(74,0); //pre-alarm disabled by default
   Serial.println("Disabled pre-alarm");
-  EEPROM.write(75,1); //pre-alarm first-stage is 1 minute by default
-  Serial.println("Set pre-alarm first stage to 1 minute");
-  EEPROM.write(76,0); //smoke detector pre-alarm is disable by default
-  Serial.println("Disabled smoke detector pre-alarm");
-  EEPROM.write(77,5); //smoke detector timeout is five minutes by default
-  Serial.println("Set smoke detector timeout to 5 minutes");
+  EEPROM.write(75,5); //pre-alarm first-stage is 1 minute by default
+  Serial.println("Set pre-alarm first stage to 5 minutes");
+  EEPROM.write(76,0); //smoke detector verification is disable by default
+  Serial.println("Disabled smoke detector verification");
+  EEPROM.write(77,12); //smoke detector verification is 1 minute by default
+  Serial.println("Set smoke detector verification to 1 minute");
   EEPROM.write(78,0); //homescreen is panel name by default
   Serial.println("Set panel name as homescreen");
   EEPROM.write(79,1); //audible silence is enabled by default
@@ -351,9 +361,9 @@ void setup() {
     preAlarm = false;
   }
   if (EEPROM.read(76) == 1){
-    smokeDetectorPreAlarm = true;
+    smokeDetectorVerification = true;
   } else {
-    smokeDetectorPreAlarm = false;
+    smokeDetectorVerification = false;
   }
   if (EEPROM.read(79) == 1){
     audibleSilence = true;
@@ -365,7 +375,7 @@ void setup() {
   } else {
     keylessSilence = false;
   }
-  smokeDetectorTimeout = EEPROM.read(77)*60000;
+  smokeDetectorVerificationTime = EEPROM.read(77)*5000;
   firstStageTime = EEPROM.read(75)*60000;
   verificationTime = EEPROM.read(10)*100;
   //resistorLenience = EEPROM.read(72)*4; DEPRECATED
@@ -442,6 +452,12 @@ void activateNAC(){
   fullAlarm = true;
   silenced = false;
   configMenu = false;
+  codeWheelTimer = 0;
+  if (zoneAlarm == 4 or preAlarm == false){
+    secondStage = true; //entirely skip first stage if it is a drill or if prealarm is turned off
+  } else {
+    secondStage = false;
+  }
   tone();
   digitalWrite(readyLed, HIGH);
   readyLedStatus = true;
@@ -472,9 +488,6 @@ void checkKey(){
 
 //----------------------------------------------------------------------------- CHECK ACTIVATION DEVICES [!THIS CODE MUST WORK!]
 void checkDevices(){
-  if (debug == true){
-    Serial.println(analogRead(zone1Pin));
-  }
   if (walkTest == false){
     if ((analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0) and horn != true and silenced==false){
       possibleAlarm = true;
@@ -483,16 +496,42 @@ void checkDevices(){
     if (possibleAlarm == true and horn != true and strobe != true and silenced==false){
       if (verification >= verificationTime or isVerification == false){
         if (analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0){
-          if (analogRead(zone1Pin) == 0 and analogRead(zone2Pin) == 0){
-            zoneAlarm = 3; //both
-          } else if (analogRead(zone2Pin) == 0){
-            zoneAlarm = 2; //z2
-          } else {
-            zoneAlarm = 1; //z1
+          if (smokeDetectorVerification == false or smokeDetectorCurrentlyInVerification == true){ // ----------------------------------- SMOKE DETECTOR VERIFICATION
+            if (analogRead(zone1Pin) == 0 and analogRead(zone2Pin) == 0){
+              zoneAlarm = 3; //both
+            } else if (analogRead(zone2Pin) == 0){
+              zoneAlarm = 2; //z2
+            } else {
+              zoneAlarm = 1; //z1
+            }
+            activateNAC();
+            possibleAlarm = false;
+            verification = 0;
+          } else if (smokeDetectorVerification == true and smokeDetectorCurrentlyInVerification == false){
+            smokeDetectorOn(false);
+            delay(100);
+            if (analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0){ // if the alarm signal persists after turning off the smoke detectors, activate the nacs
+              if (analogRead(zone1Pin) == 0 and analogRead(zone2Pin) == 0){
+                zoneAlarm = 3; //both
+              } else if (analogRead(zone2Pin) == 0){
+                zoneAlarm = 2; //z2
+              } else {
+                zoneAlarm = 1; //z1
+              }
+              smokeDetectorOn(true);
+              activateNAC();
+              possibleAlarm = false;
+              verification = 0;
+            } else {
+              smokeDetectorPostRestartTimer = 0;
+              smokeDetectorCurrentlyInVerification = true; //--------------------------FIGURE OUT HOW TO DO THE SECOND PART OF SMOKE DET VERIFICATION
+              smokeDetectorTimer = 0;
+              currentScreen = -1;
+              digitalWrite(alarmLed, HIGH);
+              possibleAlarm = false;
+              verification = 0;
+            }
           }
-          activateNAC();
-          possibleAlarm = false;
-          verification = 0;
         } else {
           possibleAlarm = false;
           verification = 0;
@@ -663,7 +702,7 @@ void checkButtons(){
     silencePressed = false;
   }
 
-  if (digitalRead(drillButtonPin) == HIGH and horn != true and silenced != true){ //------------------------------------------DRILL BUTTON
+  if (digitalRead(drillButtonPin) == HIGH and horn != true and silenced != true and fullAlarm == false){ //------------------------------------------DRILL BUTTON
     if (drill >= 237){
       zoneAlarm = 4;
       activateNAC();
@@ -674,6 +713,10 @@ void checkButtons(){
   } else {
     drill = 0;
     drillPressed = false;
+  }
+  if (digitalRead(drillButtonPin) == HIGH and fullAlarm == true and secondStage == false){
+    secondStage = true;
+    currentScreen = -1;
   }
 }
 //----------------------------------------------------------------------------- BUTTON CHECK
@@ -687,97 +730,115 @@ void alarm(){
     strobeOn(false);
   }
   if (horn == true){
-    if (codeWheel == 0){
+    if (preAlarm == false or secondStage == true){
+      if (codeWheel == 0){
 
-      if (codeWheelTimer == 0){ //temporal code 3 
-        hornOn(true);
-      } else if (codeWheelTimer == 500) {
-        hornOn(false);
-      } else if (codeWheelTimer == 1000) {
-        hornOn(true);
-      } else if (codeWheelTimer == 1500) {
-        hornOn(false);
-      } else if (codeWheelTimer == 2000) {
-        hornOn(true);
-      } else if (codeWheelTimer == 2500) {
-        hornOn(false);
-      } else if (codeWheelTimer == 4000) {
-        codeWheelTimer = -1;
-      }
+        if (codeWheelTimer == 0){ //---------- temporal code 3 
+          hornOn(true);
+        } else if (codeWheelTimer == 500) {
+          hornOn(false);
+        } else if (codeWheelTimer == 1000) {
+          hornOn(true);
+        } else if (codeWheelTimer == 1500) {
+          hornOn(false);
+        } else if (codeWheelTimer == 2000) {
+          hornOn(true);
+        } else if (codeWheelTimer == 2500) {
+          hornOn(false);
+        } else if (codeWheelTimer >= 4000) {
+          codeWheelTimer = -1;
+        }
 
+        
+      } else if (codeWheel == 1) {
+
+        if (codeWheelTimer == 0){ //---------- marchtime
+          hornOn(true);
+        } else if (codeWheelTimer == 250){
+          hornOn(false);
+        } else if (codeWheelTimer >= 500){
+          codeWheelTimer = -1;
+        }
+
+      } else if (codeWheel == 2) { //---------- 4-4
+        
+        if (codeWheelTimer == 0) {
+          hornOn(true);
+        } else if (codeWheelTimer == 300) {
+          hornOn(false);
+        } else if (codeWheelTimer == 600) {
+          hornOn(true);
+        } else if (codeWheelTimer == 900) {
+          hornOn(false);
+        } else if (codeWheelTimer == 1200) {
+          hornOn(true);
+        } else if (codeWheelTimer == 1500) {
+          hornOn(false);
+        } else if (codeWheelTimer == 1800) {
+          hornOn(true);
+        } else if (codeWheelTimer == 2100) {
+          hornOn(false);
+
+        } else if (codeWheelTimer == 2850) {
+          hornOn(true);
+        } else if (codeWheelTimer == 3150) {
+          hornOn(false);
+        } else if (codeWheelTimer == 3450) {
+          hornOn(true);
+        } else if (codeWheelTimer == 3750) {
+          hornOn(false);
+        } else if (codeWheelTimer == 4050) {
+          hornOn(true);
+        } else if (codeWheelTimer == 4350) {
+          hornOn(false);
+        } else if (codeWheelTimer == 4650) {
+          hornOn(true);
+        } else if (codeWheelTimer == 4950) {
+          hornOn(false);
+        } else if (codeWheelTimer >= 14950) {
+          codeWheelTimer = -1;
+        }
       
-    } else if (codeWheel == 1) {
-
-      if (codeWheelTimer == 0){ //marchtime
+      } else if (codeWheel == 3) { //---------- continuous
         hornOn(true);
-      } else if (codeWheelTimer == 250){
-        hornOn(false);
-      } else if (codeWheelTimer == 500){
-        codeWheelTimer = -1;
+      } else if (codeWheel == 5) {
+        if (codeWheelTimer == 0){ //---------- marchtime slower
+          hornOn(true);
+        } else if (codeWheelTimer == 500){
+          hornOn(false);
+        } else if (codeWheelTimer >= 1000){
+          codeWheelTimer = -1;
+        }
+
+      } else if (codeWheel == 4) {
+        if (codeWheelTimer == 0){ //---------- california code
+          hornOn(true);
+        } else if (codeWheelTimer == 10000){
+          hornOn(false);
+        } else if (codeWheelTimer >= 15000){
+          codeWheelTimer = -1;
+        }
+
       }
 
-    } else if (codeWheel == 2) { //4-4
+      codeWheelTimer++;
+    } else if (preAlarm == true and secondStage == false){
+      if (codeWheelTimer == 0){
+        hornOn(true);
+      } else if (codeWheelTimer == 75){
+        hornOn(false);
+      } else if (codeWheelTimer >= 5075){
+        codeWheelTimer = -1;
+      }
       
-      if (codeWheelTimer == 0) {
-        hornOn(true);
-      } else if (codeWheelTimer == 300) {
-        hornOn(false);
-      } else if (codeWheelTimer == 600) {
-        hornOn(true);
-      } else if (codeWheelTimer == 900) {
-        hornOn(false);
-      } else if (codeWheelTimer == 1200) {
-        hornOn(true);
-      } else if (codeWheelTimer == 1500) {
-        hornOn(false);
-      } else if (codeWheelTimer == 1800) {
-        hornOn(true);
-      } else if (codeWheelTimer == 2100) {
-        hornOn(false);
-
-      } else if (codeWheelTimer == 2850) {
-        hornOn(true);
-      } else if (codeWheelTimer == 3150) {
-        hornOn(false);
-      } else if (codeWheelTimer == 3450) {
-        hornOn(true);
-      } else if (codeWheelTimer == 3750) {
-        hornOn(false);
-      } else if (codeWheelTimer == 4050) {
-        hornOn(true);
-      } else if (codeWheelTimer == 4350) {
-        hornOn(false);
-      } else if (codeWheelTimer == 4650) {
-        hornOn(true);
-      } else if (codeWheelTimer == 4950) {
-        hornOn(false);
-      } else if (codeWheelTimer == 14950) {
-        codeWheelTimer = -1;
+      codeWheelTimer++;
+      firstStageTimer++;
+      if (firstStageTimer>=firstStageTime){
+        codeWheelTimer = 0;
+        secondStage = true;
+        currentScreen = -1;
       }
-    
-    } else if (codeWheel == 3) { //continuous
-      hornOn(true);
-    } else if (codeWheel == 5) {
-      if (codeWheelTimer == 0){ //marchtime slower
-        hornOn(true);
-      } else if (codeWheelTimer == 500){
-        hornOn(false);
-      } else if (codeWheelTimer == 1000){
-        codeWheelTimer = -1;
-      }
-
-    } else if (codeWheel == 4) {
-      if (codeWheelTimer == 0){ //california code
-        hornOn(true);
-      } else if (codeWheelTimer == 10000){
-        hornOn(false);
-      } else if (codeWheelTimer == 15000){
-        codeWheelTimer = -1;
-      }
-
     }
-
-    codeWheelTimer++;
   } else {
     hornOn(false);
     codeWheelTimer = 0;
@@ -803,23 +864,31 @@ void alarm(){
 //----------------------------------------------------------------------------- NAC ACTIVATION
 
 void lcdUpdate(){
-  
   if (trouble==false and fullAlarm==false and horn==false and strobe==false and walkTest == false and currentScreen != 0 and drill == 0){
-      lcd.noAutoscroll();
-      lcd.clear();
-      lcd.setCursor(2,0);
+    lcd.noAutoscroll();
+    lcd.clear();
+    lcd.setCursor(2,0);
+    if (smokeDetectorCurrentlyInVerification == true){
+      lcd.print("Smoke Verif.");
+    } else {
       lcd.print("System Normal");
-      lcd.setCursor(0,1);
-      if (panelHomescreen == 0){
-        lcd.print(panelName);
-      } else if (panelHomescreen == 1){
-        lcd.print(analogRead(zone1Pin));
-      }
-      currentScreen = 0;
+    }
+    lcd.setCursor(0,1);
+    if (panelHomescreen == 0){
+      lcd.print(panelName);
+    } else if (panelHomescreen == 1){
+      lcd.print(analogRead(zone1Pin));
+    }
+    currentScreen = 0;
+    updateLockStatus = true;
   }  else if (fullAlarm == true and silenced == false and currentScreen != 3){
     lcd.clear();
     lcd.setCursor(1,0);
-    lcd.print("* FIRE ALARM *");
+    if (secondStage == true){ //print pre-alarm if it is first stage
+      lcd.print("* FIRE ALARM *");
+    } else {
+      lcd.print("* PRE ALARM *");
+    }
     lcd.setCursor(0,1);
     if (zoneAlarm == 1){
       lcd.print("Zone 1");
@@ -831,6 +900,7 @@ void lcdUpdate(){
       lcd.print("Fire Drill");
     }
     currentScreen = 3;
+    updateLockStatus = true;
   } else if (silenced == true and currentScreen != 4){
     lcd.clear();
     lcd.setCursor(1,0);
@@ -848,6 +918,7 @@ void lcdUpdate(){
     // lcd.setCursor(2,1);
     // lcd.print("Zone 1");
     currentScreen = 4;
+    updateLockStatus = true;
   } else if (walkTest == true and currentScreen != 5) {
     lcd.clear();
     lcd.setCursor(1,0);
@@ -855,6 +926,7 @@ void lcdUpdate(){
     lcd.setCursor(0,1);
     lcd.print("Z1:"+(String)zone1Count+" Z2:"+(String)zone2Count);
     currentScreen = 5;
+    updateLockStatus = true;
     digitalWrite(readyLed, LOW); //ready led off for walk test
     readyLedStatus = false;
   } else if (drillPressed == true and fullAlarm == false and horn == false and strobe == false and walkTest == false and currentScreen != 6) {
@@ -882,6 +954,7 @@ void lcdUpdate(){
       }
     }
     currentScreen = 1;
+    updateLockStatus = true;
   }
   if (updateLockStatus == true and configMenu == false and keyRequired == true){
     lcd.setCursor(0,0);
@@ -897,19 +970,15 @@ void config(){
   char *main[] = {"Testing","Settings"}; //menu 0
   char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","Keyless Sil.:"}; //menu 3
-  char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:"}; //menu 4
+  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","No-Key Sil.:"}; //menu 3
+  char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:","Det.Verif:","Det.V.Time:"}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
-  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm: ","stage 1: ","Detector PreAlrm"}; //menu 6
-  char *mainSettingsFireAlarmSettingsPreAlarmSettingsSmokeDetectorPreAlarmSettings[] = {"Det. PreAlrm: ","Det. 1st stge: ","Det. Timeout: "}; //menu 7
+  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm:","Stage1 Time:"}; //menu 6
   char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
   char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach"}; //menu 12
   
-  
-  // char *mainPanelSettingsHomescreen[] = {"Panel Name", "Stats for Nerds"}; //menu 10
-  // char *mainPanelSettingsHomescreenStatsForNerds[] = {"Zone Input Voltages"}; //menu 11
   if (digitalRead(resetButtonPin) == HIGH){ //RESET BUTTON
     resetPressed = true;
   } else {
@@ -1067,14 +1136,22 @@ void config(){
       } else if (cursorPosition == 2) {
         cursorPosition = 3;
         configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
-        configBottom = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        if (keyRequired == true){
+          configBottom = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettings[4]+"off";
+        }
         configTop.replace("1","*");
         configTop.replace("0","$");
         configBottom.replace("1","*");
         configBottom.replace("0","$");
       } else if (cursorPosition == 3){
         cursorPosition = 4;
-        configTop = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        if (keyRequired == true){
+          configTop = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettings[4]+"off";
+        }
         configBottom = (String)mainSettingsFireAlarmSettings[0];
         configTop.replace("1","*");
         configTop.replace("0","$");
@@ -1117,8 +1194,10 @@ void config(){
       } else if (cursorPosition == 2) {
         configPage = 6;
         cursorPosition = 0;
-        configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0];
-        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1];
+        configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0]+preAlarm;
+        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        configTop.replace("1","*");
+        configTop.replace("0","$");
       } else if (cursorPosition == 3) {
         if (audibleSilence == true){
           audibleSilence = false;
@@ -1129,10 +1208,16 @@ void config(){
         }
         EEPROM.commit();
         configTop = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
-        configBottom = (String)mainSettingsFireAlarmSettings[0];
+        if (keyRequired == true){
+          configBottom = (String)mainSettingsFireAlarmSettings[4]+keylessSilence;
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettings[4]+"off";
+        }
         configTop.replace("1","*");
         configTop.replace("0","$");
-      } else if (cursorPosition == 4){
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
+      } else if (cursorPosition == 4 and keyRequired == true){
         if (keylessSilence == true){
           keylessSilence = false;
           EEPROM.write(27,0);
@@ -1434,12 +1519,40 @@ void config(){
         } else {
           configTop = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
         }
-        configBottom = (String)mainSettingsVerificationSettings[0]+isVerification;
+        configBottom = (String)mainSettingsVerificationSettings[2] + smokeDetectorVerification;
         configBottom.replace("1","*");
         configBottom.replace("0","$");
       } else if (cursorPosition == 1) {
+        cursorPosition = 2;
+        configTop = (String)mainSettingsVerificationSettings[2] + smokeDetectorVerification;
+        if (smokeDetectorVerification == true){
+          if (smokeDetectorVerificationTime<60000){
+            configBottom = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/1000) + "s";
+          } else {
+            configBottom = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/60000) + "m";
+          }
+        } else {
+          configBottom = (String)mainSettingsVerificationSettings[3] + "off";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
+      } else if (cursorPosition == 2) {
+        cursorPosition = 3;
+        if (smokeDetectorVerification == true){
+          if (smokeDetectorVerificationTime<60000){
+            configTop = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/1000) + "s";
+          } else {
+            configTop = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/60000) + "m";
+          }
+        } else {
+          configTop = (String)mainSettingsVerificationSettings[3] + "off";
+        }
+        configBottom = (String)mainSettingsVerificationSettings[0] + isVerification;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
+      } else if (cursorPosition == 3) {
         cursorPosition = 0;
-        configTop = (String)mainSettingsVerificationSettings[0]+isVerification;
+        configTop = (String)mainSettingsVerificationSettings[0] + isVerification;
         if (isVerification == false){
           configBottom = (String)mainSettingsVerificationSettings[1] + "off";
         } else {
@@ -1447,7 +1560,7 @@ void config(){
         }
         configTop.replace("1","*");
         configTop.replace("0","$");
-      }
+      } 
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 3;
       cursorPosition = 0;
@@ -1496,6 +1609,69 @@ void config(){
           configTop = (String)mainSettingsVerificationSettings[1] + "off";
         } else {
           configTop = (String)mainSettingsVerificationSettings[1] + (verificationTime/1000)+"s";
+        }
+        configBottom = (String)mainSettingsVerificationSettings[2] + smokeDetectorVerification;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
+      } else if (cursorPosition == 2){
+        if (smokeDetectorVerification == false){
+          EEPROM.write(76,1); //enable pre-alarm
+          smokeDetectorVerification = true;
+        } else {
+          EEPROM.write(76,0); //disable pre-alarm
+          smokeDetectorVerification = false;
+          smokeDetectorOn(true); //re-enable smoke detectors in the case that one turned off because it was in verification
+        }
+        EEPROM.commit();
+        configTop = (String)mainSettingsVerificationSettings[2] + smokeDetectorVerification;
+        if (smokeDetectorVerification == true){
+          if (smokeDetectorVerificationTime<60000){
+            configBottom = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/1000) + "s";
+          } else {
+            configBottom = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/60000) + "m";
+          }
+        } else {
+          configBottom = (String)mainSettingsVerificationSettings[3] + "off";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
+      } else if (cursorPosition == 3 and smokeDetectorVerification == true) {
+        if (smokeDetectorVerificationTime == 5000){
+          EEPROM.write(77,2);
+          smokeDetectorVerificationTime = 10000;
+        } else if (smokeDetectorVerificationTime == 10000){
+          EEPROM.write(77,3);
+          smokeDetectorVerificationTime = 15000;
+        } else if (smokeDetectorVerificationTime == 15000){
+          EEPROM.write(77,4);
+          smokeDetectorVerificationTime = 20000;
+        } else if (smokeDetectorVerificationTime == 20000){
+          EEPROM.write(77,6);
+          smokeDetectorVerificationTime = 30000;
+        } else if (smokeDetectorVerificationTime == 30000){
+          EEPROM.write(77,9);
+          smokeDetectorVerificationTime = 45000;
+        } else if (smokeDetectorVerificationTime == 45000){
+          EEPROM.write(77,18);
+          smokeDetectorVerificationTime = 60000;
+        } else if (smokeDetectorVerificationTime == 60000){
+          EEPROM.write(77,24);
+          smokeDetectorVerificationTime = 120000;
+        } else if (smokeDetectorVerificationTime == 120000){
+          EEPROM.write(77,60);
+          smokeDetectorVerificationTime = 300000;
+        } else if (smokeDetectorVerificationTime == 300000){
+          EEPROM.write(77,120);
+          smokeDetectorVerificationTime = 600000;
+        } else if (smokeDetectorVerificationTime == 600000){
+          EEPROM.write(77,1);
+          smokeDetectorVerificationTime = 5000;
+        }
+        EEPROM.commit();
+        if (smokeDetectorVerificationTime<60000){
+          configTop = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/1000) + "s";
+        } else {
+          configTop = (String)mainSettingsVerificationSettings[3] + (smokeDetectorVerificationTime/60000) + "m";
         }
         configBottom = (String)mainSettingsVerificationSettings[0]+isVerification;
         configBottom.replace("1","*");
@@ -1569,7 +1745,93 @@ void config(){
       configBottom = (String)mainPanelSettings[1];
     }
 //----------------------------------------------------------------------------- SETTINGS > PANEL > ABOUT
+
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > PRE-ALARM
+  } else if (configPage == 6){
+    if (resetPressed == true and resetStillPressed == false){
+      if (cursorPosition == 0){
+        cursorPosition = 1;
+        if (preAlarm == true){
+          configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        } else {
+          configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + "off";
+        }
+        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0] + preAlarm;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
+
+      } else if (cursorPosition == 1){
+        cursorPosition = 0;
+        configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0]+preAlarm;
+        if (preAlarm == true){
+          configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + "off";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
+      }
+    } else if (silencePressed == true and silenceStillPressed == false){
+      configPage = 3;
+      cursorPosition = 0;
+      configTop = (String)mainSettingsFireAlarmSettings[0];
+      configBottom = (String)mainSettingsFireAlarmSettings[1];
+    } else if (drillPressed == true and drillStillPressed == false){
+      if (cursorPosition == 0){
+        if (preAlarm == false){
+          EEPROM.write(74,1); //enable pre-alarm
+          preAlarm = true;
+        } else {
+          EEPROM.write(74,0); //disable pre-alarm
+          preAlarm = false;
+        }
+        EEPROM.commit();
+        configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0]+preAlarm;
+        if (preAlarm == true){
+          configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + "off";
+        }
+        configTop.replace("1","*");
+        configTop.replace("0","$");
+      } else if (cursorPosition == 1 and preAlarm == true) {
+        if (firstStageTime == 60000){
+          EEPROM.write(75,2);
+          firstStageTime = 120000;
+        } else if (firstStageTime == 120000){
+          EEPROM.write(75,3);
+          firstStageTime = 180000;
+        } else if (firstStageTime == 180000){
+          EEPROM.write(75,4);
+          firstStageTime = 240000;
+        } else if (firstStageTime == 240000){
+          EEPROM.write(75,5);
+          firstStageTime = 300000;
+        } else if (firstStageTime == 300000){
+          EEPROM.write(75,7);
+          firstStageTime = 420000;
+        } else if (firstStageTime == 420000){
+          EEPROM.write(75,10);
+          firstStageTime = 600000;
+        } else if (firstStageTime == 600000){
+          EEPROM.write(75,15);
+          firstStageTime = 900000;
+        } else if (firstStageTime == 900000){
+          EEPROM.write(75,20);
+          firstStageTime = 1200000;
+        } else if (firstStageTime == 1200000){
+          EEPROM.write(75,1);
+          firstStageTime = 60000;
+        }
+        EEPROM.commit();
+        configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[2] + smokeDetectorVerification;
+        configBottom.replace("1","*");
+        configBottom.replace("0","$");
+      } 
+    }
   }
+//----------------------------------------------------------------------------- SETTINGS > FIRE ALARM > PRE-ALARM
 
 
 // ---------------------------------------------------------------------------- CONFIG SCREEN REDRAW
@@ -1646,18 +1908,37 @@ void lcdBacklight(){
   }
 }
 
+void smokeDetector(){
+  if (smokeDetectorTimer >= smokeDetectorVerificationTime){
+    smokeDetectorOn(true);
+    if (smokeDetectorPostRestartTimer >= 60000){
+      smokeDetectorCurrentlyInVerification = false;
+      currentScreen = -1;
+      digitalWrite(alarmLed, LOW);
+      smokeDetectorTimer = 0;
+    } else {
+      smokeDetectorPostRestartTimer++;
+    } 
+  } else {
+    smokeDetectorTimer++;
+  }
+} 
+
 void loop() {
   systemClock = millis(); //-------------------- SYSTEM CLOCK
   if (systemClock-lastPulse >= 1){
 
     lcdBacklight(); //------------------------------------------------------ CHECK LCD BACKLIGHT 
 
-
     checkDevices(); //------------------------------------------------------ CHECK ACTIVATING DEVICES
     
     troubleCheck(); //------------------------------------------------------ TROUBLE CHECK
 
     alarm(); //------------------------------------------------------------- ALARM CODEWHEEL
+
+    if (smokeDetectorCurrentlyInVerification == true){
+      smokeDetector();
+    }
 
     if (keyCheckTimer >= 100){
       checkKey(); //---------------------------------------------------------- CHECK KEY 
@@ -1699,6 +1980,3 @@ void loop() {
     lastPulse = millis(); //update last pulse
   }
 }
-
-
-
