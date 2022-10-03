@@ -1102,9 +1102,9 @@ void config(){
       }
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 0;
-      cursorPosition = 0;
-      configTop = (String)main[0];
-      configBottom = (String)main[1];
+      cursorPosition = 1;
+      configTop = (String)main[1];
+      configBottom = (String)main[0];
     } else if (drillPressed == true and drillStillPressed == false){
       if (cursorPosition == 0){
         configPage = 3; //change screen to facp settings
@@ -1195,7 +1195,11 @@ void config(){
         configPage = 6;
         cursorPosition = 0;
         configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0]+preAlarm;
-        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        if (preAlarm == true){
+          configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
+        } else {
+          configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + "off";
+        }
         configTop.replace("1","*");
         configTop.replace("0","$");
       } else if (cursorPosition == 3) {
@@ -1273,9 +1277,9 @@ void config(){
       }
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 2;
-      cursorPosition = 0;
-      configTop = (String)mainSettings[0];
-      configBottom = (String)mainSettings[1];
+      cursorPosition = 1;
+      configTop = (String)mainSettings[1];
+      configBottom = (String)mainSettings[0];
     } else if (drillPressed == true and drillStillPressed == false){
       if (cursorPosition == 0){
         configPage = 10;
@@ -1399,9 +1403,9 @@ void config(){
     configTop = "silence = no";
     if (silencePressed == true and silenceStillPressed == false){
       configPage = 8;
-      cursorPosition = 0;
-      configTop = (String)mainPanelSettings[0];
-      configBottom = (String)mainPanelSettings[1];
+      cursorPosition = 3;
+      configTop = (String)mainPanelSettings[3];
+      configBottom = (String)mainPanelSettings[4];
     } else if (drillPressed == true and drillStillPressed == false){
       digitalWrite(readyLed, LOW); //ready LED
       lcd.clear();
@@ -1563,9 +1567,9 @@ void config(){
       } 
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 3;
-      cursorPosition = 0;
-      configTop = (String)mainSettingsFireAlarmSettings[0];
-      configBottom = (String)mainSettingsFireAlarmSettings[1];
+      cursorPosition = 1;
+      configTop = (String)mainSettingsFireAlarmSettings[1];
+      configBottom = (String)mainSettingsFireAlarmSettings[2];
     } else if (drillPressed == true and drillStillPressed == false){
       if (cursorPosition == 0){
         if (isVerification == true){
@@ -1708,9 +1712,15 @@ void config(){
       }
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 8;
-      cursorPosition = 0;
-      configTop = (String)mainPanelSettings[0];
-      configBottom = (String)mainPanelSettings[1];
+      cursorPosition = 1;
+      configTop = (String)mainPanelSettings[1];
+      if (lcdTimeout == 0){
+        configBottom = (String)mainPanelSettings[2] + "off";
+      } else if (lcdTimeout<=30000) {
+        configBottom = (String)mainPanelSettings[2] + lcdTimeout/1000+"s";
+      } else {
+        configBottom = (String)mainPanelSettings[2] + lcdTimeout/60000+"m";
+      }
     } else if (drillPressed == true and drillStillPressed == false){
       if (cursorPosition == 0){
         EEPROM.write(8,0); //write the new keyswitch settings to eeprom
@@ -1727,6 +1737,8 @@ void config(){
       }
     }
 //----------------------------------------------------------------------------- SETTINGS > PANEL > PANEL SECURITY
+
+//----------------------------------------------------------------------------- SETTINGS > PANEL > ABOUT
   } else if (configPage == 12){
     if (resetPressed == true and resetStillPressed == false){
       if (cursorPosition == 0){
@@ -1744,9 +1756,9 @@ void config(){
       }
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 8;
-      cursorPosition = 0;
-      configTop = (String)mainPanelSettings[0];
-      configBottom = (String)mainPanelSettings[1];
+      cursorPosition = 4;
+      configTop = (String)mainPanelSettings[4];
+      configBottom = (String)mainPanelSettings[0];
     }
 //----------------------------------------------------------------------------- SETTINGS > PANEL > ABOUT
 
@@ -1777,9 +1789,11 @@ void config(){
       }
     } else if (silencePressed == true and silenceStillPressed == false){
       configPage = 3;
-      cursorPosition = 0;
-      configTop = (String)mainSettingsFireAlarmSettings[0];
-      configBottom = (String)mainSettingsFireAlarmSettings[1];
+      cursorPosition = 2;
+      configTop = (String)mainSettingsFireAlarmSettings[2];
+      configBottom = (String)mainSettingsFireAlarmSettings[3]+audibleSilence;
+      configBottom.replace("1","*");
+      configBottom.replace("0","$");
     } else if (drillPressed == true and drillStillPressed == false){
       if (cursorPosition == 0){
         if (preAlarm == false){
@@ -1829,7 +1843,7 @@ void config(){
         }
         EEPROM.commit();
         configTop = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[1] + (firstStageTime/60000) + "m";
-        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[2] + smokeDetectorVerification;
+        configBottom = (String)mainSettingsFireAlarmSettingsPreAlarmSettings[0] + preAlarm;
         configBottom.replace("1","*");
         configBottom.replace("0","$");
       } 
