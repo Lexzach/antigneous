@@ -1621,6 +1621,10 @@ void config(){
           EEPROM.write(76,0); //disable pre-alarm
           smokeDetectorVerification = false;
           smokeDetectorOn(true); //re-enable smoke detectors in the case that one turned off because it was in verification
+          digitalWrite(alarmLed, LOW);
+          smokeDetectorCurrentlyInVerification=false;
+          smokeDetectorPostRestartTimer=0;
+          smokeDetectorTimer=0;
         }
         EEPROM.commit();
         configTop = (String)mainSettingsVerificationSettings[2] + smokeDetectorVerification;
