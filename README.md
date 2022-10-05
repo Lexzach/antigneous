@@ -16,7 +16,7 @@ The code that is being ran in an Antigneous fire alarm control panel is complete
 # Features and Limitations ⚖️
 Although I have tried to make Antigneous as feature-rich as possible, there are some limitations to take into consideration...
 
-## Features
+## Features ✅
 - LCD display
 - Very customizable, tinker friendly design
 - Many coding selections: Temporal three, Code 4-4, Marchtime, Continuous, California Code, and Slower Marchtime
@@ -27,8 +27,9 @@ Although I have tried to make Antigneous as feature-rich as possible, there are 
 - Fail-safe mode in case of unbootable panel
 - Selectable security levels, electronic keyswitch or no keyswitch
 
-## Current Limitations
+## Current Limitations ❎
 - No EOL support for NAC circuit
 - No strobe sync, SmartSync, or two wire sync (CURRENTLY)
+- No support for 2 wire smoke detectors
 - Only 2 zones
 
