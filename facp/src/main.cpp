@@ -450,6 +450,7 @@ void activateNAC(){
   silenced = false;
   inConfigMenu = false;
   codeWheelTimer = 0;
+  strobeSyncTimer = 0;
   secondStage = (zoneAlarm == 4 or not preAlarm) ? true : false; //entirely skip first stage if it is a drill or if prealarm is turned off
   tone();
   digitalWrite(readyLed, HIGH);
@@ -1085,7 +1086,6 @@ void config(){
       configLCDUpdate(0, (String)main[0], (String)main[1]);
       strobe = false;
       smokeDetectorOn(true);
-      digitalWrite(readyLed,HIGH);
     } else if (drillPressed and not drillStillPressed){
         if (cursorPosition == 0){
           walkTest = true;
@@ -1107,12 +1107,10 @@ void config(){
           if (not strobe){
             strobe = true;
             smokeDetectorOn(false); //prevent (specifically cheap IR) smoke detectors from tripping from the strobe 
-            digitalWrite(readyLed,LOW);
             configLCDUpdate(2, (String)mainTesting[2]+" *", (String)mainTesting[0]);
           } else {
             strobe = false;
             smokeDetectorOn(true);
-            digitalWrite(readyLed,HIGH);
             configLCDUpdate(2, (String)mainTesting[2], (String)mainTesting[0]);
           }
         }
