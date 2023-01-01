@@ -713,7 +713,7 @@ void checkButtons(){
 //----------------------------------------------------------------------------- NAC ACTIVATION
 void alarm(){
   if (strobe){
-    if (strobeSync == 0){ //add more strobesyncs in the future
+    if (strobeSync != 1 and strobeSync != 2){ //add more strobesyncs in the future
       strobeOn(true);
     } else if (strobeSync == 1 or strobeSync == 2){
       if (strobeSyncTimer >= 1000){
@@ -1027,7 +1027,7 @@ void config(){
   char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
-  char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock"};//,"Gentex","Simplex"}; //menu 11
+  char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
   char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach"}; //menu 12
   
   if (digitalRead(resetButtonPin)){ //RESET BUTTON
