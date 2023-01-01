@@ -28,11 +28,12 @@ Although I have tried to make Antigneous as feature-rich as possible, there are 
 - Pull station and smoke detector verification
 - Fail-safe mode in case of unbootable panel
 - Selectable security levels, electronic keyswitch or no keyswitch
+- Strobe Sync support for System Sensor and Wheelock (more will be added)
 
 ## Current Limitations ❎
 - **NOT OFFICIALLY TESTED**! This should *not* be used in place of a fire panel from a name brand company
 - No EOL support for NAC circuit
-- No strobe sync, SmartSync, or two wire sync (CURRENTLY)
+- No SmartSync, or two wire sync (CURRENTLY)
 - No support for 2 wire smoke detectors
 - Only 2 zones
 
