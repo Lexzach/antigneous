@@ -219,7 +219,7 @@ void setup() {
   EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
   Serial.println("Configured EEPROM for addresses 0-1024");
   Serial.begin(115200); //begin serial
-  Serial.println("Lexzach's Low-Cost FACP v1");
+  Serial.println("Lexzach's Low-Cost FACP v1.4");
   Serial.println("Booting...");
 
 //----------------------------------------------------------------------------- SETUP PINS
