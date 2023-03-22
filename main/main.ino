@@ -134,7 +134,7 @@ byte cross[] = { //x mark
 };
 //---------------------------------------- CUSTOM LCD CHARACTERS
 
-//PINS
+//PIN DEFINITIONS
 int zone1Pin = 15;
 int zone2Pin = 15; //TESTING is set to 15 but is normally 39.
 int hornRelay = 13;
