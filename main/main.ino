@@ -2004,9 +2004,10 @@ void failsafe(){ //--------------------------------------------- FAILSAFE MODE I
 
 
 void loop() {
-  systemClock = millis(); //-------------------- SYSTEM CLOCK
+  systemClock = millis(); //-------------------------------------------------- SYSTEM CLOCK
+
   if (systemClock-lastPulse >= 1){
-    if (not failsafeMode){
+    if (not failsafeMode){ //execute the loop only if the panel is not in failsafe mode
       lcdBacklight(); //------------------------------------------------------ CHECK LCD BACKLIGHT 
 
       checkDevices(); //------------------------------------------------------ CHECK ACTIVATING DEVICES
@@ -2054,7 +2055,7 @@ void loop() {
       } else {
         buttonCheckTimer++;
       }
-    } else {
+    } else { //failsafe mode
       failsafe();
     }
     lastPulse = millis(); //update last pulse
