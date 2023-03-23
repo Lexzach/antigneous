@@ -8,7 +8,7 @@ Antigneous is an open-source conventional fire alarm control panel, 3 years in t
 # What do you mean by "open-source" 🔓
 **You do not have to give a single cent to me in order to build this panel.**
 
-The code that is being ran in an Antigneous fire alarm control panel is completely visible to everyone and anyone, [right here](https://github.com/Lexzach/antigneous/blob/official-firmware/facp/src/main.cpp)! Don't like something about Antigneous, you can change it (or even better submit an issue or pull request). All hardware that is used in the making of an Antigneous panel is available to anyone. The wiring diagram for making your own is also available to anyone.
+The code that is being ran in an Antigneous fire alarm control panel is completely visible to everyone and anyone, [right here](https://github.com/Lexzach/antigneous/blob/official-firmware/main/main.ino)! Don't like something about Antigneous, you can change it (or even better submit an issue or pull request). All hardware that is used in the making of an Antigneous panel is available to anyone. The wiring diagram for making your own is also available to anyone.
 
 # Instruction Manuals 📄
 📕 [Normal Instruction Manual](https://github.com/Lexzach/antigneous/blob/official-firmware/instructions/antigneous_instructions.pdf) - [Download](https://github.com/Lexzach/antigneous/raw/official-firmware/instructions/antigneous_instructions.pdf)
