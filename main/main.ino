@@ -1021,7 +1021,7 @@ void config(){
   char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
   char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","No-Key Sil.:","Strobe Sync","2 Wire:"}; //menu 3
-  char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:","Det.Verif.:","Det.Timeout:","Det.Verif.:"}; //menu 4
+  char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:","Det.Verif.:","Det.Timeout:","Det.Watch:"}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm:","Stage1 Time:"}; //menu 6
   char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
