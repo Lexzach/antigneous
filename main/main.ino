@@ -136,7 +136,7 @@ byte cross[] = { //x mark
 
 //PIN DEFINITIONS
 int zone1Pin = 15;
-int zone2Pin = 15; //TESTING is set to 15 but is normally 39.
+int zone2Pin = 39; //TESTING is set to 15 but is normally 39.
 int hornRelay = 13;
 int buzzerPin = 4;
 int strobeRelay = 18;
