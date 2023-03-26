@@ -1195,7 +1195,7 @@ void config(){
         if (keyRequiredVisual){
           configLCDUpdate(3, (String)mainSettingsFireAlarmSettings[3]+audibleSilence, (String)mainSettingsFireAlarmSettings[4]+keylessSilence, true, true);
         } else {
-          configLCDUpdate(3, (String)mainSettingsFireAlarmSettings[3]+audibleSilence, (String)mainSettingsFireAlarmSettings[4]+keylessSilence+"off", true, false);
+          configLCDUpdate(3, (String)mainSettingsFireAlarmSettings[3]+audibleSilence, (String)mainSettingsFireAlarmSettings[4]+"off", true, false);
         }
       } else if (cursorPosition == 3){
         if (keyRequiredVisual){
