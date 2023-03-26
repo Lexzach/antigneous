@@ -3,6 +3,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <string.h>
 
+bool invertRelay = false; //------------------IF YOUR RELAYS OPERATE THE OPPOSITE OF HOW YOU EXPECT, CHANGE THIS TO 'TRUE' 
+
 unsigned long systemClock; //-----------------SYSTEM CLOCK [VERY IMPORTANT]
 unsigned long lastPulse; //-------------------LAST void loop() PULSE
 bool failsafeMode = false; // If panel fails to boot, you can enter a reduced-feature down panel that is guaranteed to work
@@ -241,9 +243,16 @@ void setup() {
   pinMode(zone2Pin, INPUT); //zone 2
 
   pinMode(buzzerPin, OUTPUT); //buzzer
-  digitalWrite(hornRelay, HIGH); //horn
-  digitalWrite(strobeRelay, HIGH); //strobe
-  digitalWrite(smokeDetectorRelay, HIGH); //smoke relay
+
+  if (not invertRelay){
+    digitalWrite(hornRelay, HIGH); //horn
+    digitalWrite(strobeRelay, HIGH); //strobe
+    digitalWrite(smokeDetectorRelay, HIGH); //smoke relay
+  } else {
+    digitalWrite(hornRelay, LOW); //horn
+    digitalWrite(strobeRelay, LOW); //strobe
+    digitalWrite(smokeDetectorRelay, LOW); //smoke relay
+  }
   
   pinMode(sclPin, OUTPUT); //scl
   pinMode(sdaPin, OUTPUT); //sda
@@ -386,7 +395,11 @@ void setup() {
     panelUnlocked = (digitalRead(keySwitchPin) and keyRequired) ? true : false; //check the key status on startup
     digitalWrite(silenceLed, LOW);
     digitalWrite(alarmLed, LOW);
-    digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    if (invertRelay){
+      digitalWrite(smokeDetectorRelay, HIGH); //turn on smoke relay
+    } else {
+      digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    }
     Serial.println("-=- STARTUP COMPLETE -=-");
   } else {
     Serial.println("-=- ENTERING FAILSAFE MODE -=-");
@@ -402,7 +415,11 @@ void setup() {
     lcd.setCursor(0,1);
     lcd.print("SYSTEM NORMAL");
     digitalWrite(readyLed, HIGH);
-    digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    if (invertRelay){
+      digitalWrite(smokeDetectorRelay, HIGH); //turn on smoke relay
+    } else {
+      digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    }
   }
   lastPulse = millis(); //start last pulse
 }
@@ -421,24 +438,48 @@ void noTone() {
 }
 void hornOn(bool on){
   if (on){
-    digitalWrite(hornRelay, LOW); //turn on horn relay
+    if (invertRelay){
+      digitalWrite(hornRelay, HIGH); //turn on horn relay
+    } else {
+      digitalWrite(hornRelay, LOW); //turn on horn relay
+    }
   } else {
-    digitalWrite(hornRelay, HIGH); //turn off horn relay
+    if (invertRelay){
+      digitalWrite(hornRelay, LOW); //turn on horn relay
+    } else {
+      digitalWrite(hornRelay, HIGH); //turn on horn relay
+    }
   }
 }
 void strobeOn(bool on){
   if (on){
-    digitalWrite(strobeRelay, LOW); //turn on strobe relay without strobe sync
+    if (invertRelay){
+      digitalWrite(strobeRelay, HIGH); //turn on strobe relay without strobe sync
+    } else {
+      digitalWrite(strobeRelay, LOW); //turn on strobe relay without strobe sync
+    }
   } else {
-    digitalWrite(strobeRelay, HIGH); //turn off strobe relay
+    if (invertRelay){
+      digitalWrite(strobeRelay, LOW); //turn on strobe relay without strobe sync
+    } else {
+      digitalWrite(strobeRelay, HIGH); //turn on strobe relay without strobe sync
+    }
   }
 }
 
 void smokeDetectorOn(bool on){
   if (on){
-    digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    if (invertRelay){
+      digitalWrite(smokeDetectorRelay, HIGH); //turn on smoke relay
+    } else {
+      digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    }
   } else {
-    digitalWrite(smokeDetectorRelay, HIGH); //turn off smoke relay
+    if (invertRelay){
+      digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
+    } else {
+      digitalWrite(smokeDetectorRelay, HIGH); //turn on smoke relay
+    }
   }
 }
 //---------------------------------------------------------------------------------------- functions for turning certain things on and off
@@ -1963,8 +2004,13 @@ void failsafe(){ //--------------------------------------------- FAILSAFE MODE I
     fullAlarm = true;
     silenced = false;
     digitalWrite(alarmLed, HIGH);
-    digitalWrite(hornRelay, LOW);
-    digitalWrite(strobeRelay, LOW);
+    if (invertRelay){
+      digitalWrite(hornRelay, HIGH);
+      digitalWrite(strobeRelay, HIGH);
+    } else {
+      digitalWrite(hornRelay, LOW);
+      digitalWrite(strobeRelay, LOW);
+    }
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("FAILSAFE MODE");
@@ -1973,8 +2019,13 @@ void failsafe(){ //--------------------------------------------- FAILSAFE MODE I
   }
   if (digitalRead(silenceButtonPin) and not silenced and fullAlarm){
     silenced = true;
-    digitalWrite(hornRelay, HIGH);
-    digitalWrite(silenceLed,HIGH);
+    if (invertRelay){
+      digitalWrite(hornRelay, LOW);
+      digitalWrite(strobeRelay, LOW);
+    } else {
+      digitalWrite(hornRelay, HIGH);
+      digitalWrite(strobeRelay, HIGH);
+    }
     digitalWrite(alarmLed,LOW);
     lcd.clear();
     lcd.setCursor(0,0);
@@ -1983,8 +2034,15 @@ void failsafe(){ //--------------------------------------------- FAILSAFE MODE I
     lcd.print("SILENCED");
   }
   if (digitalRead(resetButtonPin)){
-    digitalWrite(smokeDetectorRelay, HIGH);
-    digitalWrite(hornRelay, HIGH);
+    if (invertRelay){
+      digitalWrite(smokeDetectorRelay, LOW);
+      digitalWrite(hornRelay, LOW);
+      digitalWrite(strobeRelay, LOW);      
+    } else {
+      digitalWrite(smokeDetectorRelay, HIGH);
+      digitalWrite(hornRelay, HIGH);
+      digitalWrite(strobeRelay, HIGH);
+    }
     digitalWrite(silenceLed,LOW);
     digitalWrite(alarmLed,LOW);
     digitalWrite(readyLed,LOW);
