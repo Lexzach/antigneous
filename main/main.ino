@@ -1081,7 +1081,7 @@ void config(){
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
   char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
-  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach","Hrs."}; //menu 12
+  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach","Hrs On: "}; //menu 12
   
   if (digitalRead(resetButtonPin)){ //RESET BUTTON
     resetPressed = true;
@@ -1780,8 +1780,10 @@ void config(){
       if (cursorPosition == 0){
         configLCDUpdate(1, (String)mainPanelSettingsAbout[1]+firmwareRev, (String)mainPanelSettingsAbout[2]);   
       } else if (cursorPosition == 1) {
-        configLCDUpdate(2, (String)mainPanelSettingsAbout[2], (String)mainPanelSettingsAbout[0]);   
+        configLCDUpdate(2, (String)mainPanelSettingsAbout[2], (String)mainPanelSettingsAbout[3]+powerOnMinutes/60);   
       } else if (cursorPosition == 2) {
+        configLCDUpdate(3, (String)mainPanelSettingsAbout[3]+powerOnMinutes/60, (String)mainPanelSettingsAbout[0]);   
+      } else if (cursorPosition == 3){
         configLCDUpdate(0, (String)mainPanelSettingsAbout[0], (String)mainPanelSettingsAbout[1]+firmwareRev);   
       }
     } else if (silencePressed and not silenceStillPressed){
