@@ -140,7 +140,7 @@ byte cross[] = { //x mark
 
 //PIN DEFINITIONS
 int zone1Pin = 15;
-int zone2Pin = 39; //TESTING is set to 15 but is normally 39.
+int zone2Pin = 39; //IF YOU WANT A SINGLE ZONE, SET THIS TO 15 AS WELL, ELSE 39.
 int hornRelay = 13;
 int buzzerPin = 4;
 int strobeRelay = 18;
@@ -2014,7 +2014,7 @@ void smokeDetector(){
 } 
 
 void powerOnTracker(){
-  if (powerOnMinutesCounter >= 600){
+  if (powerOnMinutesCounter >= 60000){
     powerOnMinutesCounter = 0;
     powerOnMinutes++;
     byte byte_array[4];
