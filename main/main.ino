@@ -73,7 +73,8 @@ int zone1Count = 0; //walk test variables
 int zone2Count = 0;
 int zoneAlarm = 0; //which zone is in alarm 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2 | 4 - drill
 int zoneTrouble = 0; //which zone is in trouble 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2
-int powerOnHours = 0;
+int powerOnMinutes = 0; //amount of hours the panel has been powered on for, kinda like an odometer for the FACP
+int powerOnMinutesCounter = 0; //keep track of when to iterate the EEPROM value for uptime minutes
 String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
@@ -211,6 +212,11 @@ void resetEEPROM() {
   Serial.println("Enabled audible silence");
   EEPROM.write(80,0); //lcd timeout is disabled by default (time in MS found by taking value and multiplying it by 15000)
   Serial.println("Disabled LCD timeout");
+  EEPROM.write(81,0);
+  EEPROM.write(82,0);
+  EEPROM.write(83,0);
+  EEPROM.write(84,0);
+  Serial.println("Set runtime to 0 minutes");
 
 
   EEPROM.commit();
@@ -222,7 +228,7 @@ void setup() {
   EEPROM.begin(512); //allocate memory address 0-1024 for EEPROM
   Serial.println("Configured EEPROM for addresses 0-512");
   Serial.begin(115200); //begin serial
-  Serial.println("Lexzach's Low-Cost FACP v1.5");
+  Serial.println("Lexzach's Low-Cost FACP");
   Serial.println("Booting...");
 
 //----------------------------------------------------------------------------- SETUP PINS
@@ -346,7 +352,7 @@ void setup() {
     lcd.print("IO-SLFTST");
 
     Serial.println("Current EEPROM dump:"); //dump EEPROM into serial monitor
-    for (int i=0; i<=1024; i++){
+    for (int i=0; i<=511; i++){
       Serial.print(i);
       Serial.print(":");
       Serial.print(EEPROM.read(i));
@@ -376,6 +382,11 @@ void setup() {
     panelHomescreen = EEPROM.read(78);
     lcdTimeout = EEPROM.read(80)*15000;
     strobeSync = EEPROM.read(29);
+    byte byte_array[4];
+    for (int i = 0; i < 4; i++) {
+      byte_array[i] = EEPROM.read(81+i); // read each byte from consecutive addresses
+      powerOnMinutes = powerOnMinutes | ((unsigned long)byte_array[i] << (i * 8)); // reconstruct the number from the bytes
+    }
     int x=0;
     for (int i=11; i<=26; i++){ //read panel name
       if (EEPROM.read(i) != 0){
@@ -1070,7 +1081,7 @@ void config(){
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
   char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
-  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach"}; //menu 12
+  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach","Hrs."}; //menu 12
   
   if (digitalRead(resetButtonPin)){ //RESET BUTTON
     resetPressed = true;
@@ -2000,6 +2011,21 @@ void smokeDetector(){
   }
 } 
 
+void powerOnTracker(){
+  if (powerOnMinutesCounter >= 600){
+    powerOnMinutesCounter = 0;
+    powerOnMinutes++;
+    byte byte_array[4];
+    for (int i = 0; i < 4; i++) {
+      byte_array[i] = (powerOnMinutes >> (i * 8)) & 0xFF; // split number into four bytes
+      EEPROM.write(81+i, byte_array[i]); // store each byte in consecutive addresses
+    }
+    EEPROM.commit();
+  } else {
+    powerOnMinutesCounter++;
+  }
+}
+
 void failsafe(){ //--------------------------------------------- FAILSAFE MODE IN CASE PANEL CANT BOOT NORMALLY
   if ((analogRead(zone1Pin) == 0 or analogRead(zone2Pin) == 0) and not fullAlarm){
     fullAlarm = true;
@@ -2067,6 +2093,8 @@ void loop() {
 
   if (systemClock-lastPulse >= 1){
     if (not failsafeMode){ //execute the loop only if the panel is not in failsafe mode
+      powerOnTracker(); //---------------------------------------------------- INCREMENT THE POWER ON MINUTES
+
       lcdBacklight(); //------------------------------------------------------ CHECK LCD BACKLIGHT 
 
       checkDevices(); //------------------------------------------------------ CHECK ACTIVATING DEVICES
