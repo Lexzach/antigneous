@@ -9,9 +9,9 @@ unsigned long systemClock; //-----------------SYSTEM CLOCK [VERY IMPORTANT]
 unsigned long lastPulse; //-------------------LAST void loop() PULSE
 bool failsafeMode = false; // If panel fails to boot, you can enter a reduced-feature down panel that is guaranteed to work
 
-char *firmwareRev = "v1.4"; //VERSION
+char *firmwareRev = "v1.5"; //VERSION
 int EEPROMVersion = 1; //version control to rewrite eeprom after update
-int EEPROMBuild = 4;
+int EEPROMBuild = 5;
 
 //patents
 // https://patents.google.com/patent/US5559492 - simplex
@@ -73,6 +73,7 @@ int zone1Count = 0; //walk test variables
 int zone2Count = 0;
 int zoneAlarm = 0; //which zone is in alarm 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2 | 4 - drill
 int zoneTrouble = 0; //which zone is in trouble 0 - none | 1 - zone 1 | 2 - zone 2 | 3 - zone 1 & 2
+int powerOnHours = 0;
 String configTop; //configuration menu strings for lcd
 String configBottom;
 String currentConfigTop; //configuration menu strings for current lcd display
@@ -157,7 +158,7 @@ int sdaPin = 21;
 
 //----------------------------------------------------------------------------- EEPROM RESET
 void resetEEPROM() {
-  for (int i=0; i<=1024; i++){ //write all 255's from 0-1024 address
+  for (int i=0; i<=512; i++){ //write all 255's from 0-1024 address
       EEPROM.write(i,255);
   }
   Serial.println("Erased EEPROM");
@@ -218,10 +219,10 @@ void resetEEPROM() {
 //----------------------------------------------------------------------------- EEPROM RESET
 
 void setup() {
-  EEPROM.begin(1025); //allocate memory address 0-1024 for EEPROM
-  Serial.println("Configured EEPROM for addresses 0-1024");
+  EEPROM.begin(512); //allocate memory address 0-1024 for EEPROM
+  Serial.println("Configured EEPROM for addresses 0-512");
   Serial.begin(115200); //begin serial
-  Serial.println("Lexzach's Low-Cost FACP v1.4");
+  Serial.println("Lexzach's Low-Cost FACP v1.5");
   Serial.println("Booting...");
 
 //----------------------------------------------------------------------------- SETUP PINS
