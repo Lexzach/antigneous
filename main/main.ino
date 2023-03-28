@@ -140,7 +140,7 @@ byte cross[] = { //x mark
 
 //PIN DEFINITIONS
 int zone1Pin = 15;
-int zone2Pin = 39; //IF YOU WANT A SINGLE ZONE, SET THIS TO 15 AS WELL, ELSE 39.
+int zone2Pin = 15; //IF YOU WANT A SINGLE ZONE, SET THIS TO 15 AS WELL, ELSE 39.
 int hornRelay = 13;
 int buzzerPin = 4;
 int strobeRelay = 18;
@@ -284,23 +284,20 @@ void setup() {
       lcd.print((String)"HOLD BUTTONS - "+i);
       delay(1000);
     }
+    lcd.clear();
+    lcd.setCursor(0,0);
     if (digitalRead(resetButtonPin) and digitalRead(silenceButtonPin) and digitalRead(drillButtonPin)){
-      lcd.clear();
-      lcd.setCursor(0,0);
       lcd.print("RESETTING TO");
       lcd.setCursor(0,1);
       lcd.print("FACTORY SETTINGS");
       resetEEPROM();
-      delay(4000);
-      ESP.restart();
     } else {
-      lcd.clear();
-      lcd.setCursor(0,0);
       lcd.print("FACTORY RESET");
       lcd.setCursor(0,1);
       lcd.print("CANCELLED");
-      delay(3000);
     }
+    delay(3000);
+    ESP.restart();
   }
 //----------------------------------------------------------------------------- EEPROM RESET BUTTONS
 
@@ -729,17 +726,35 @@ void checkButtons(){
 //----------------------------------------------------------------------------- NAC ACTIVATION
 void alarm(){
   if (strobe){
-    if (strobeSync != 1 and strobeSync != 2){ //add more strobesyncs in the future
+    if (strobeSync == 0){ //add more strobesyncs in the future
       strobeOn(true);
-    } else if (strobeSync == 1 or strobeSync == 2){
-      if (strobeSyncTimer >= 1000){
-        strobeSyncTimer=0;
-      } else if (strobeSyncTimer >= 975){
-        strobeOn(false);
-      } else if (strobeSyncTimer <= 10){
-        strobeOn(true);
-      }
+    } else {
       strobeSyncTimer++;
+      if (strobeSync == 1 or strobeSync == 4){
+        if (strobeSyncTimer >= 10000){
+          strobeSyncTimer=0;
+        } else if (strobeSyncTimer >= 9940){
+          strobeOn(false);
+        } else if (strobeSyncTimer <= 60){
+          strobeOn(true);
+        }
+      } else if (strobeSync == 2) {
+        if (strobeSyncTimer >= 2000){
+          strobeSyncTimer=0;
+        } else if (strobeSyncTimer >= 1968){
+          strobeOn(false);
+        } else if (strobeSyncTimer <= 32){
+          strobeOn(true);
+        }
+      } else if (strobeSync == 3) {
+        if (strobeSyncTimer >= 2000){
+          strobeSyncTimer=0;
+        } else if (strobeSyncTimer >= 1985){
+          strobeOn(false);
+        } else if (strobeSyncTimer <= 15){
+          strobeOn(true);
+        }
+      } 
     }
   }else{
     strobeOn(false);
@@ -776,7 +791,7 @@ void alarm(){
           codeWheelTimer = -1;
         }
 
-      } else if (codeWheel == 2) { //---------- 4-4
+      } else if (codeWheel == 2) { //--------- 4-4
         
         if (codeWheelTimer == 0) {
           hornOn(true);
@@ -815,7 +830,7 @@ void alarm(){
           codeWheelTimer = -1;
         }
       
-      } else if (codeWheel == 3) { //---------- continuous
+      } else if (codeWheel == 3) { //--------- continuous
         hornOn(true);
       } else if (codeWheel == 5) {
         if (codeWheelTimer == 0){ //---------- marchtime slower
@@ -1033,18 +1048,18 @@ void configLCDUpdate(int cursor, String top, String bottom, bool replaceTop = fa
 }
 
 void config(){
-  char *main[] = {"Testing","Settings"}; //menu 0
-  char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
-  char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","No-Key Sil.:","Strobe Sync","2 Wire:"}; //menu 3
-  char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:","Det.Verif.:","Det.Timeout:","Det.Watch:"}; //menu 4
-  char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
-  char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm:","Stage1 Time:"}; //menu 6
-  char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
-  char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
-  char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
-  char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
-  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Nightly ","Made by Lexzach","Hrs On: "}; //menu 12
+  const char *main[] = {"Testing","Settings"}; //menu 0
+  const char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
+  const char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
+  const char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","No-Key Sil.:","Strobe Sync","2 Wire:"}; //menu 3
+  const char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:","Det.Verif.:","Det.Timeout:","Det.Watch:"}; //menu 4
+  const char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
+  const char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm:","Stage1 Time:"}; //menu 6
+  const char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
+  const char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
+  const char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
+  const char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
+  const char *mainPanelSettingsAbout[] = {"Antigneous FACP","Nightly ","Made by Lexzach","Hrs On: "}; //menu 12
   
   if (digitalRead(resetButtonPin)){ //RESET BUTTON
     resetPressed = true;
@@ -2038,6 +2053,7 @@ void failsafe(){ //--------------------------------------------- FAILSAFE MODE I
     digitalWrite(silenceLed,LOW);
     digitalWrite(alarmLed,LOW);
     digitalWrite(readyLed,LOW);
+    delay(500);
     ESP.restart();
   }
   if (troubleLedTimer >= 2000){
