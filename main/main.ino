@@ -1044,7 +1044,7 @@ void config(){
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
   char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
-  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Firmware: ","by Lexzach","Hrs On: "}; //menu 12
+  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Nightly ","Made by Lexzach","Hrs On: "}; //menu 12
   
   if (digitalRead(resetButtonPin)){ //RESET BUTTON
     resetPressed = true;
