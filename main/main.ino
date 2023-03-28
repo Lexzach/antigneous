@@ -1043,8 +1043,8 @@ void config(){
   char *mainPanelSettings[] = {"Panel Name","Panel Security","LCD Dim:","Factory Reset","About"}; //menu 8
   char *mainPanelSettingsPanelSecurity[] = {"None","Keyswitch","Passcode"}; //menu 9
   char *mainPanelSettingsPanelName[] = {"Enter Name:"}; //menu 10
-  char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock", "Gentex","Simplex"}; //menu 11
-  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Nightly ","Made by Lexzach","Hrs On: "}; //menu 12
+  char *mainSettingsFireAlarmSettingsStrobeSync[] = {"None","System Sensor","Wheelock"}; //menu 11
+  char *mainPanelSettingsAbout[] = {"Antigneous FACP","Stable ","Made by Lexzach","Hrs On: "}; //menu 12
   
   if (digitalRead(resetButtonPin)){ //RESET BUTTON
     resetPressed = true;
@@ -1179,14 +1179,8 @@ void config(){
           configLCDUpdate(4, (String)mainSettingsFireAlarmSettings[4]+"off", (String)mainSettingsFireAlarmSettings[5], false, false);
         }
       } else if (cursorPosition == 4) {
-        configLCDUpdate(5, (String)mainSettingsFireAlarmSettings[5], (String)mainSettingsFireAlarmSettings[6]+useTwoWire, false, true);
+        configLCDUpdate(5, (String)mainSettingsFireAlarmSettings[5], (String)mainSettingsFireAlarmSettings[0], false, false);
       } else if (cursorPosition == 5){
-        if (useTwoWire){
-          configLCDUpdate(6, (String)mainSettingsFireAlarmSettings[6]+useTwoWire, (String)mainSettingsFireAlarmSettings[0]+"off", true, false);
-        } else {
-          configLCDUpdate(6, (String)mainSettingsFireAlarmSettings[6]+useTwoWire, (String)mainSettingsFireAlarmSettings[0], true, false);
-        }
-      } else if (cursorPosition == 6){
         if (useTwoWire){
           configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0] + " off", (String)mainSettingsFireAlarmSettings[1]);
         } else {
@@ -1252,20 +1246,6 @@ void config(){
           configLCDUpdate(0, (String)mainSettingsFireAlarmSettingsStrobeSync[0], (String)mainSettingsFireAlarmSettingsStrobeSync[1] + "*");
         } else {
           configLCDUpdate(0, (String)mainSettingsFireAlarmSettingsStrobeSync[0], (String)mainSettingsFireAlarmSettingsStrobeSync[1]);
-        }
-      } else if (cursorPosition == 6){
-        if (useTwoWire){
-          useTwoWire = false;
-          EEPROM.write(30,0);
-        } else {
-          useTwoWire = true;
-          EEPROM.write(30,1);
-        }
-        EEPROM.commit();
-        if (useTwoWire){
-          configLCDUpdate(cursorPosition, (String)mainSettingsFireAlarmSettings[6]+useTwoWire, (String)mainSettingsFireAlarmSettings[0] + " off", true, false);
-        } else {
-          configLCDUpdate(cursorPosition, (String)mainSettingsFireAlarmSettings[6]+useTwoWire, (String)mainSettingsFireAlarmSettings[0], true, false);
         }
       }
     }
@@ -1838,29 +1818,13 @@ void config(){
         }
       } else if (cursorPosition == 1) {
         if (strobeSync == 2){
-          configLCDUpdate(2, (String)mainSettingsFireAlarmSettingsStrobeSync[2]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[3]);
-        } else if (strobeSync == 3){
-          configLCDUpdate(2, (String)mainSettingsFireAlarmSettingsStrobeSync[2], (String)mainSettingsFireAlarmSettingsStrobeSync[3]+"*");
+          configLCDUpdate(2, (String)mainSettingsFireAlarmSettingsStrobeSync[2]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[0]);
+        } else if (strobeSync == 0){
+          configLCDUpdate(2, (String)mainSettingsFireAlarmSettingsStrobeSync[2], (String)mainSettingsFireAlarmSettingsStrobeSync[0]+"*");
         } else{
-          configLCDUpdate(2, (String)mainSettingsFireAlarmSettingsStrobeSync[2], (String)mainSettingsFireAlarmSettingsStrobeSync[3]);
+          configLCDUpdate(2, (String)mainSettingsFireAlarmSettingsStrobeSync[2], (String)mainSettingsFireAlarmSettingsStrobeSync[0]);
         }
       } else if (cursorPosition == 2) {
-        if (strobeSync == 3){
-          configLCDUpdate(3, (String)mainSettingsFireAlarmSettingsStrobeSync[3]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[4]);
-        } else if (strobeSync == 4){
-          configLCDUpdate(3, (String)mainSettingsFireAlarmSettingsStrobeSync[3], (String)mainSettingsFireAlarmSettingsStrobeSync[4]+"*");
-        } else{
-          configLCDUpdate(3, (String)mainSettingsFireAlarmSettingsStrobeSync[3], (String)mainSettingsFireAlarmSettingsStrobeSync[4]);
-        }
-      } else if (cursorPosition == 3) {
-        if (strobeSync == 4){
-          configLCDUpdate(4, (String)mainSettingsFireAlarmSettingsStrobeSync[4]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[0]);
-        } else if (strobeSync == 5){
-          configLCDUpdate(4, (String)mainSettingsFireAlarmSettingsStrobeSync[4], (String)mainSettingsFireAlarmSettingsStrobeSync[0]+"*");
-        } else{
-          configLCDUpdate(4, (String)mainSettingsFireAlarmSettingsStrobeSync[4], (String)mainSettingsFireAlarmSettingsStrobeSync[0]);
-        }
-      } else if (cursorPosition == 4) {
         if (strobeSync == 0){
           configLCDUpdate(0, (String)mainSettingsFireAlarmSettingsStrobeSync[0]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[1]);
         } else if (strobeSync == 1){
@@ -1871,11 +1835,11 @@ void config(){
       }
     } else if (silencePressed and not silenceStillPressed){
       configPage = 3; //change screen to facp settings
-      configLCDUpdate(5, (String)mainSettingsFireAlarmSettings[5], (String)mainSettingsFireAlarmSettings[6]+useTwoWire, false, true);
+      configLCDUpdate(5, (String)mainSettingsFireAlarmSettings[5], (String)mainSettingsFireAlarmSettings[0], false, false);
     } else if (drillPressed and not drillStillPressed){
       EEPROM.write(29,cursorPosition); //write strobe sync settings
       EEPROM.commit();
-      if (cursorPosition == 4){
+      if (cursorPosition == 2){
         configLCDUpdate(cursorPosition, (String)mainSettingsFireAlarmSettingsStrobeSync[cursorPosition]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[0]);
       } else {
         configLCDUpdate(cursorPosition, (String)mainSettingsFireAlarmSettingsStrobeSync[cursorPosition]+"*", (String)mainSettingsFireAlarmSettingsStrobeSync[cursorPosition+1]);
