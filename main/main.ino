@@ -384,8 +384,8 @@ void setup() {
     strobeSync = EEPROM.read(29);
     byte byte_array[4];
     for (int i = 0; i < 4; i++) {
-      byte_array[i] = EEPROM.read(81+i); // read each byte from consecutive addresses
-      powerOnMinutes = powerOnMinutes | ((unsigned long)byte_array[i] << (i * 8)); // reconstruct the number from the bytes
+      byte_array[i] = EEPROM.read(81+i); //read each byte from consecutive addresses
+      powerOnMinutes = powerOnMinutes | ((unsigned long)byte_array[i] << (i * 8)); //reconstruct the number from the bytes
     }
     int x=0;
     for (int i=11; i<=26; i++){ //read panel name
@@ -449,50 +449,13 @@ void noTone() {
   ledcWriteTone(0, 0); // stop tone
 }
 void hornOn(bool on){
-  if (on){
-    if (invertRelay){
-      digitalWrite(hornRelay, HIGH); //turn on horn relay
-    } else {
-      digitalWrite(hornRelay, LOW); //turn on horn relay
-    }
-  } else {
-    if (invertRelay){
-      digitalWrite(hornRelay, LOW); //turn on horn relay
-    } else {
-      digitalWrite(hornRelay, HIGH); //turn on horn relay
-    }
-  }
+  digitalWrite(hornRelay, (invertRelay ^ on) ? LOW : HIGH);
 }
 void strobeOn(bool on){
-  if (on){
-    if (invertRelay){
-      digitalWrite(strobeRelay, HIGH); //turn on strobe relay without strobe sync
-    } else {
-      digitalWrite(strobeRelay, LOW); //turn on strobe relay without strobe sync
-    }
-  } else {
-    if (invertRelay){
-      digitalWrite(strobeRelay, LOW); //turn on strobe relay without strobe sync
-    } else {
-      digitalWrite(strobeRelay, HIGH); //turn on strobe relay without strobe sync
-    }
-  }
+  digitalWrite(strobeRelay, (invertRelay ^ on) ? LOW : HIGH);
 }
-
 void smokeDetectorOn(bool on){
-  if (on){
-    if (invertRelay){
-      digitalWrite(smokeDetectorRelay, HIGH); //turn on smoke relay
-    } else {
-      digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
-    }
-  } else {
-    if (invertRelay){
-      digitalWrite(smokeDetectorRelay, LOW); //turn on smoke relay
-    } else {
-      digitalWrite(smokeDetectorRelay, HIGH); //turn on smoke relay
-    }
-  }
+  digitalWrite(smokeDetectorRelay, (invertRelay ^ on) ? LOW : HIGH);
 }
 //---------------------------------------------------------------------------------------- functions for turning certain things on and off
 
