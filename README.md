@@ -11,9 +11,9 @@ Antigneous is an open-source conventional fire alarm control panel, 3 years in t
 The code that is being ran in an Antigneous fire alarm control panel is completely visible to everyone and anyone, [right here](https://github.com/Lexzach/antigneous/blob/official-firmware/main/main.ino)! Don't like something about Antigneous, you can change it (or even better submit an issue or pull request). All hardware that is used in the making of an Antigneous panel is available to anyone. The wiring diagram for making your own is also available to anyone.
 
 # Instruction Manuals 📄
-📕 [Basic Assembly and Operation Manual](https://github.com/Lexzach/antigneous/blob/official-firmware/instructions/antigneous_instructions.pdf) - [Download](https://github.com/Lexzach/antigneous/raw/official-firmware/instructions/antigneous_instructions.pdf)
+📕 [Basic Assembly and Operation Manual](https://github.com/Lexzach/antigneous/blob/nightly-firmware/instructions/antigneous_instructions.pdf) - [Download](https://github.com/Lexzach/antigneous/raw/nightly-firmware/instructions/antigneous_instructions.pdf)
 
-📚 [Technical Instruction Manual](https://github.com/Lexzach/antigneous/blob/official-firmware/instructions/antigneous_tech_instructions.pdf) - [Download](https://github.com/Lexzach/antigneous/raw/official-firmware/instructions/antigneous_tech_instructions.pdf)
+📚 [Technical Instruction Manual](https://github.com/Lexzach/antigneous/blob/nightly-firmware/instructions/antigneous_tech_instructions.pdf) - [Download](https://github.com/Lexzach/antigneous/raw/nightly-firmware/instructions/antigneous_tech_instructions.pdf)
 
 # Features and Limitations ⚖️
 Although I have tried to make Antigneous as feature-rich as possible, there are some limitations to take into consideration...
