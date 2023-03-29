@@ -1,7 +1,9 @@
 # ⚠️ TESTED FIRMWARE IS IN [RELEASES](https://github.com/Lexzach/antigneous/releases) ⚠️
 
+[![](https://dcbadge.vercel.app/api/server/fwqYtBrfqs)](https://discord.gg/fwqYtBrfqs)
+
 [![forthebadge](https://forthebadge.com/images/badges/made-with-c-plus-plus.svg)](https://forthebadge.com) [![forthebadge](https://forthebadge.com/images/badges/open-source.svg)](https://forthebadge.com) [![forthebadge](https://forthebadge.com/images/badges/built-with-love.svg)](https://forthebadge.com)
-![Icon](https://github.com/Lexzach/antigneous/blob/official-firmware/gh_icon.png?raw=true)
+![Icon](https://github.com/Lexzach/antigneous/blob/nightly-firmware/misc/gh_icon.png?raw=true)
 # What is this? 🔥
 Antigneous is an open-source conventional fire alarm control panel, 3 years in the making. A fire alarm control panel is the device responsible for controlling all of the devices in a fire alarm system, such as smoke detectors, pull stations, and notification devices. Normally, a fire alarm control panel will run you back hundreds, if not thousands of dollars. This project strives to fix that issue by allowing for anyone to build their own reliable fire alarm control panel without breaking the bank.
 
