@@ -140,7 +140,7 @@ byte cross[] = { //x mark
 
 //PIN DEFINITIONS
 int zone1Pin = 15;
-int zone2Pin = 15; //IF YOU WANT A SINGLE ZONE, SET THIS TO 15 AS WELL, ELSE 39.
+int zone2Pin = 39; //IF YOU WANT A SINGLE ZONE, SET THIS TO 15 AS WELL, ELSE 39.
 int hornRelay = 13;
 int buzzerPin = 4;
 int strobeRelay = 18;
@@ -731,11 +731,11 @@ void alarm(){
     } else {
       strobeSyncTimer++;
       if (strobeSync == 1 or strobeSync == 4){
-        if (strobeSyncTimer >= 10000){
+        if (strobeSyncTimer >= 1000){
           strobeSyncTimer=0;
-        } else if (strobeSyncTimer >= 9940){
+        } else if (strobeSyncTimer >= 975){
           strobeOn(false);
-        } else if (strobeSyncTimer <= 60){
+        } else if (strobeSyncTimer <= 25){
           strobeOn(true);
         }
       } else if (strobeSync == 2) {
@@ -871,7 +871,7 @@ void alarm(){
       }
     }
   } else if (useTwoWire){       //-------------------------------- DO MORE TESTING WITH THIS!!!!
-    if (horn and (not preAlarm or secondStage)){
+    if (horn and (not preAlarm or secondStage)){ //2 wire alarm
       if (twoWireTimer >= 1000){
         twoWireTimer = 0;
       } else if (twoWireTimer >= 975){
@@ -880,7 +880,7 @@ void alarm(){
         hornOn(true);
       }
       twoWireTimer++;
-    } else if (not horn and silenced and audibleSilence){
+    } else if (not horn and silenced and audibleSilence){ //2 wire silence
       if (twoWireTimer >= 1000){
         twoWireTimer = 0;
       } else if (twoWireTimer >= 965){
@@ -889,7 +889,7 @@ void alarm(){
         hornOn(true);
       }
       twoWireTimer++;
-    } else if (horn and preAlarm and not secondStage){
+    } else if (horn and preAlarm and not secondStage){ //2 wire pre-alarm
       if (codeWheelTimer == 0){
         hornOn(true);
       } else if (codeWheelTimer == 75){
