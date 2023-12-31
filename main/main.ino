@@ -13,15 +13,6 @@ char *firmwareRev = "v1.5"; //VERSION
 int EEPROMVersion = 1; //version control to rewrite eeprom after update
 int EEPROMBuild = 5;
 
-//patents
-// https://patents.google.com/patent/US5559492 - simplex
-// https://patents.google.com/patent/US6281789 - simplex smartsync
-// https://patents.google.com/patent/US6194994 - wheelock
-// https://patents.google.com/patent/US5659287A/en - gentex strobe sync
-// https://patents.google.com/patent/US5959528 - gentex smartsync
-// https://patents.google.com/patent/US8928191B2/en - potter weird universal sync
-
-
 //----------------------------------------------------------------------------- RUNTIME VARIABLES
 bool fullAlarm = false; //bool to control if this is a full alarm that requres a panel reset to clear
 bool silenced = false;
@@ -86,8 +77,6 @@ bool preAlarm = false; //use pre-alarm?
 bool smokeDetectorVerification = false; //should smoke detectors activate first stage
 bool smokeDetectorCurrentlyInVerification = false; //Is a smoke detector currently in verification?
 bool audibleSilence = true;
-bool useTwoWire = false; //does the panel use 2 wire for alarms
-int twoWireTimer = 0; //timer for 2 wire alarms
 int smokeDetectorTimeout = 60000; //how long to wait before toggling smoke detectors back on
 int smokeDetectorPostRestartTimer = 0; //variable to keep track of the 60 seconds post-power up that the panel watches the smoke detector
 int smokeDetectorPostRestartVerificationTime = 120000; //time in ms that the smoke detector should be monitored
@@ -373,7 +362,6 @@ void setup() {
     smokeDetectorVerification = EEPROM.read(76) == 1 ? true : false;
     audibleSilence = EEPROM.read(79) == 1 ? true : false;
     keylessSilence = EEPROM.read(27) == 1 ? true : false;
-    useTwoWire = EEPROM.read(30) == 1 ? true : false;
     smokeDetectorTimeout = EEPROM.read(77)*5000;
     smokeDetectorPostRestartVerificationTime = EEPROM.read(28)*5000;
     firstStageTime = EEPROM.read(75)*60000;
@@ -745,7 +733,7 @@ void alarm(){
     strobeOn(false);
     strobeSyncTimer = 0;
   }
-  if (horn and not useTwoWire){
+  if (horn){
     if (not preAlarm or secondStage){ //yes, preAlarm == false is redundant but in the case that second stage == false, but pre-alarm is off, the full alarm will still sound
       if (codeWheel == 0){
 
@@ -855,46 +843,9 @@ void alarm(){
         currentScreen = -1;
       }
     }
-  } else if (useTwoWire){       //-------------------------------- DO MORE TESTING WITH THIS!!!!
-    if (horn and (not preAlarm or secondStage)){
-      if (twoWireTimer >= 1000){
-        twoWireTimer = 0;
-      } else if (twoWireTimer >= 975){
-        hornOn(false);
-      } else if (twoWireTimer <= 10){
-        hornOn(true);
-      }
-      twoWireTimer++;
-    } else if (not horn and silenced and audibleSilence){
-      if (twoWireTimer >= 1000){
-        twoWireTimer = 0;
-      } else if (twoWireTimer >= 965){
-        hornOn(false);
-      } else if (twoWireTimer <= 10){
-        hornOn(true);
-      }
-      twoWireTimer++;
-    } else if (horn and preAlarm and not secondStage){
-      if (codeWheelTimer == 0){
-        hornOn(true);
-      } else if (codeWheelTimer == 75){
-        hornOn(false);
-      } else if (codeWheelTimer >= 5075){
-        codeWheelTimer = -1;
-      }
-      
-      codeWheelTimer++;
-      firstStageTimer++;
-      if (firstStageTimer>=firstStageTime){
-        codeWheelTimer = 0;
-        secondStage = true;
-        currentScreen = -1;
-      }
-    }
   } else {
     hornOn(false);
     codeWheelTimer = 0;
-    twoWireTimer = 0;
   }
   if (fullAlarm){
     alarmLedTimer++;
@@ -1036,7 +987,7 @@ void config(){
   char *main[] = {"Testing","Settings"}; //menu 0
   char *mainTesting[] = {"Walk Test","Silent Wlk Test","Strobe Test"}; //menu 1
   char *mainSettings[] = {"Fire Alarm","Panel"}; //menu 2
-  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","No-Key Sil.:","Strobe Sync","2 Wire:"}; //menu 3
+  char *mainSettingsFireAlarmSettings[] = {"Coding","Verification","Pre-Alarm","Audible Sil.:","No-Key Sil.:","Strobe Sync"}; //menu 3
   char *mainSettingsVerificationSettings[] = {"Verification:","V.Time:","Det.Verif.:","Det.Timeout:","Det.Watch:"}; //menu 4
   char *mainSettingsFireAlarmSettingsCoding[] = {"Temporal Three","Marchtime","4-4","Continuous","California","Slow Marchtime"}; //menu 5
   char *mainSettingsFireAlarmSettingsPreAlarmSettings[] = {"Pre-Alarm:","Stage1 Time:"}; //menu 6
@@ -1147,11 +1098,7 @@ void config(){
     } else if (drillPressed and not drillStillPressed){
       if (cursorPosition == 0){
         configPage = 3; //change screen to facp settings
-        if (useTwoWire){
-          configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0] + " off", (String)mainSettingsFireAlarmSettings[1]);
-        } else {
-          configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0], (String)mainSettingsFireAlarmSettings[1]);
-        }
+        configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0], (String)mainSettingsFireAlarmSettings[1]);
       } else if (cursorPosition == 1){
         configPage = 8; //change screen to facp settings
         configLCDUpdate(0, (String)mainPanelSettings[0], (String)mainPanelSettings[1]);
@@ -1181,17 +1128,13 @@ void config(){
       } else if (cursorPosition == 4) {
         configLCDUpdate(5, (String)mainSettingsFireAlarmSettings[5], (String)mainSettingsFireAlarmSettings[0], false, false);
       } else if (cursorPosition == 5){
-        if (useTwoWire){
-          configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0] + " off", (String)mainSettingsFireAlarmSettings[1]);
-        } else {
-          configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0], (String)mainSettingsFireAlarmSettings[1]);
-        }
+        configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0], (String)mainSettingsFireAlarmSettings[1]);
       }
     } else if (silencePressed and not silenceStillPressed){
       configPage = 2;
       configLCDUpdate(0, (String)mainSettings[0], (String)mainSettings[1]);
     } else if (drillPressed and not drillStillPressed){
-      if (cursorPosition == 0 and not useTwoWire){
+      if (cursorPosition == 0){
         configPage = 5;
         if (codeWheel == 0){
           configLCDUpdate(0, (String)mainSettingsFireAlarmSettingsCoding[0] + "*", (String)mainSettingsFireAlarmSettingsCoding[1]);
@@ -1461,11 +1404,7 @@ void config(){
       }
     } else if (silencePressed and not silenceStillPressed){
       configPage = 3; //change screen to facp settings
-      if (useTwoWire){
-        configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0] + " off", (String)mainSettingsFireAlarmSettings[1]);
-      } else {
-        configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0], (String)mainSettingsFireAlarmSettings[1]);
-      }
+      configLCDUpdate(0, (String)mainSettingsFireAlarmSettings[0], (String)mainSettingsFireAlarmSettings[1]);
     } else if (drillPressed and not drillStillPressed){
       EEPROM.write(7,cursorPosition); //write the new codewheel settings to eeprom
       EEPROM.commit();
