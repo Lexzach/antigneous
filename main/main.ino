@@ -314,11 +314,7 @@ void setup() {
     Serial.println("EEPROM verification failed.");
     lcd.clear();
     lcd.setCursor(0,0);
-    if (EEPROM.read(50) != EEPROMVersion or EEPROM.read(51) != EEPROMBuild){ //display error 2 if the firmware is different
-      lcd.print("ERROR 2");
-    } else {
-      lcd.print("ERROR 1");
-    }
+    lcd.print("ERROR 1");
     lcd.setCursor(0,1); 
     lcd.print("check manual");
     while(not digitalRead(resetButtonPin) and not digitalRead(drillButtonPin)){ //wait until button is pressed
