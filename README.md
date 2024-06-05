@@ -1,3 +1,5 @@
+# **DEVELOPMENT MOVED TO https://code.lexza.ch/Lexzach/antigneous**
+<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 # ⚠️ TESTED FIRMWARE IS IN [RELEASES](https://github.com/Lexzach/antigneous/releases) ⚠️
 
 [![](https://dcbadge.vercel.app/api/server/fwqYtBrfqs)](https://discord.gg/fwqYtBrfqs)
