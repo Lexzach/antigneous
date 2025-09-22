@@ -1,4 +1,4 @@
-# **DEVELOPMENT MOVED TO https://code.lexza.ch/Lexzach/antigneous**
+# **DEVELOPMENT MOVED TO https://git.lexza.ch/Lexzach/antigneous**
 <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 # ⚠️ TESTED FIRMWARE IS IN [RELEASES](https://github.com/Lexzach/antigneous/releases) ⚠️
 
